@@ -1,4 +1,4 @@
-package com.ksu1012.factory; // <--- KEEP YOUR PACKAGE NAME
+package com.ksu1012.factory;
 
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.ScreenUtils;
 
 public class Main extends ApplicationAdapter {
@@ -17,39 +18,55 @@ public class Main extends ApplicationAdapter {
 
     // --- GAME SETTINGS ---
     private final int TILE_SIZE = 32;
-    private final int MAP_WIDTH = 50;  // Made map bigger to test movement
+    private final int MAP_WIDTH = 50;
     private final int MAP_HEIGHT = 50;
+
+    // --- DATA LAYER ---
+    private Tile[][] map; // The actual data storage
 
     // --- VISUAL SETTINGS ---
     private final Color GROUND_COLOR_1 = new Color(0.15f, 0.15f, 0.15f, 1f);
     private final Color GROUND_COLOR_2 = new Color(0.18f, 0.18f, 0.18f, 1f);
+    private final Color HIGHLIGHT_COLOR = new Color(1f, 1f, 1f, 0.3f); // Semi-transparent white
+    private final Color RESOURCE_COLOR = new Color(0.8f, 0.5f, 0.2f, 1f); // Copper-ish color
 
     // --- PHYSICS SETTINGS ---
-    private final float ACCELERATION = 5000f; // px / s^2
-    private final float MAX_SPEED = 500f; // px / s
-    private final float FRICTION = 0.93f; // Friction coefficient -- smaller = more friction
+    private final float ACCELERATION = 4000f;
+    private final float MAX_SPEED = 500f;
+    private final float FRICTION = 0.93f;
 
     // --- PHYSICS STATE ---
     private Vector2 velocity = new Vector2(0, 0);
     private Vector2 inputVector = new Vector2(0, 0);
 
+    // Mouse Interaction
+    private Vector3 mousePos = new Vector3(); // Vector3 because camera uses 3D space (Z-axis)
+    private Tile hoveredTile = null;
+
     @Override
     public void create() {
-        // Setup Camera
         camera = new OrthographicCamera();
-
-        // Center the camera on the map initially
         camera.position.set(MAP_WIDTH * TILE_SIZE / 2f, MAP_HEIGHT * TILE_SIZE / 2f, 0);
-
         shapeRenderer = new ShapeRenderer();
 
-        // Mouse inputs
+        // --- INITIALIZE MAP DATA ---
+        map = new Tile[MAP_WIDTH][MAP_HEIGHT];
+        for (int x = 0; x < MAP_WIDTH; x++) {
+            for (int y = 0; y < MAP_HEIGHT; y++) {
+                map[x][y] = new Tile(x, y);
+
+                // Temp: Randomly scatter some resources
+                if (Math.random() < 0.1) { // 10% chance
+                    map[x][y].hasResource = true;
+                }
+            }
+        }
+
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override
             public boolean scrolled(float amountX, float amountY) {
-                camera.zoom += camera.zoom * amountY * 0.1f;
-
-                // Zoom limits
+                float zoomSpeed = 0.1f;
+                camera.zoom += amountY * camera.zoom * zoomSpeed;
                 camera.zoom = MathUtils.clamp(camera.zoom, 0.2f, 4.0f);
                 return true;
             }
@@ -69,18 +86,34 @@ public class Main extends ApplicationAdapter {
 
         // --- PHYSICS LOGIC ---
         handleInput(deltaTime);
-
-        // Apply velocity to camera position
-        // We multiply by deltaTime to make movement smooth regardless of FPS
         camera.position.x += velocity.x * deltaTime;
         camera.position.y += velocity.y * deltaTime;
-
-        // Update camera matrices
         camera.update();
 
+        // --- INTERACTION LOGIC (Mouse Picking) ---
+        // Get raw mouse coordinates (Pixels from bottom-left)
+        mousePos.set(Gdx.input.getX(), Gdx.input.getY(), 0);
+
+        // "Unproject" converts Screen Pixels -> Game World Coordinates
+        camera.unproject(mousePos);
+
+        // Convert World Coordinates -> Grid Index
+        int gridX = (int) (mousePos.x / TILE_SIZE);
+        int gridY = (int) (mousePos.y / TILE_SIZE);
+
+        // Check bounds
+        if (gridX >= 0 && gridX < MAP_WIDTH && gridY >= 0 && gridY < MAP_HEIGHT) {
+            hoveredTile = map[gridX][gridY];
+        } else {
+            hoveredTile = null;
+        }
+
         // --- RENDER LOGIC ---
-        // Clear screen with a dark color (matching our ground)
         ScreenUtils.clear(0.1f, 0.1f, 0.1f, 1);
+
+        // Enable alpha blending (transparency) for the highlight square
+        Gdx.gl.glEnable(Gdx.gl.GL_BLEND);
+        Gdx.gl.glBlendFunc(Gdx.gl.GL_SRC_ALPHA, Gdx.gl.GL_ONE_MINUS_SRC_ALPHA);
 
         shapeRenderer.setProjectionMatrix(camera.combined);
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
@@ -88,25 +121,36 @@ public class Main extends ApplicationAdapter {
         // Draw Map
         for (int x = 0; x < MAP_WIDTH; x++) {
             for (int y = 0; y < MAP_HEIGHT; y++) {
-                // Use the subtle colors defined at the top
-                if ((x + y) % 2 == 0) {
+                Tile tile = map[x][y];
+
+                // Color Logic
+                if (tile.hasResource) {
+                    shapeRenderer.setColor(RESOURCE_COLOR);
+                } else if ((x + y) % 2 == 0) {
                     shapeRenderer.setColor(GROUND_COLOR_1);
                 } else {
                     shapeRenderer.setColor(GROUND_COLOR_2);
                 }
+
                 shapeRenderer.rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
             }
         }
 
-        // Draw a dot in the center of the screen where the camera is looking
+        // Draw Hover Highlight
+        if (hoveredTile != null) {
+            shapeRenderer.setColor(HIGHLIGHT_COLOR);
+            shapeRenderer.rect(hoveredTile.x * TILE_SIZE, hoveredTile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        }
+
+        // Draw Center Dot
         shapeRenderer.setColor(Color.RED);
         shapeRenderer.circle(camera.position.x, camera.position.y, 5);
 
         shapeRenderer.end();
+        Gdx.gl.glDisable(Gdx.gl.GL_BLEND);
     }
 
     private void handleInput(float delta) {
-        // Reset input vector
         inputVector.set(0, 0);
 
         if (Gdx.input.isKeyPressed(Input.Keys.W)) inputVector.y += 1;
@@ -114,26 +158,20 @@ public class Main extends ApplicationAdapter {
         if (Gdx.input.isKeyPressed(Input.Keys.A)) inputVector.x -= 1;
         if (Gdx.input.isKeyPressed(Input.Keys.D)) inputVector.x += 1;
 
-        // --- NORMALIZATION ---
         if (inputVector.len() > 0) {
             inputVector.nor();
         }
 
-        // --- ACCELERATION ---
         if (inputVector.len() > 0) {
             velocity.x += inputVector.x * ACCELERATION * delta;
             velocity.y += inputVector.y * ACCELERATION * delta;
         }
 
-        // --- FRICTION (Deceleration) ---
         velocity.scl(FRICTION);
 
-        // Stop completely if very slow (prevents micro-sliding)
         if (velocity.len() < 10f) {
             velocity.set(0, 0);
         }
-
-        // --- MAX SPEED CLAMP ---
         velocity.clamp(0, MAX_SPEED);
     }
 
