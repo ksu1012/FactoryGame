@@ -58,7 +58,7 @@ public class Main extends ApplicationAdapter {
 
                 // Temp: Randomly scatter some resources
                 if (Math.random() < 0.1) { // 10% chance
-                    map[x][y].hasResource = true;
+                    map[x][y].type = TerrainType.COPPER_ORE;
                 }
             }
         }
@@ -94,12 +94,7 @@ public class Main extends ApplicationAdapter {
 
     // Handles all game logic, physics, and input.
     private void update(float delta) {
-        // --- PHYSICS ---
-        handleInput(delta);
-
-        camera.position.x += velocity.x * delta;
-        camera.position.y += velocity.y * delta;
-        camera.update();
+        updatePosition(delta);
 
         // --- MOUSE INPUT ---
         mousePos.set(Gdx.input.getX(), Gdx.input.getY(), 0);
@@ -116,7 +111,7 @@ public class Main extends ApplicationAdapter {
 
         // --- BUILDING PLACEMENT ---
         if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
-            if (hoveredTile != null && hoveredTile.building == null && hoveredTile.hasResource) {
+            if (hoveredTile != null && hoveredTile.building == null && hoveredTile.type == TerrainType.COPPER_ORE) {
                 hoveredTile.building = new Drill(gridX, gridY);
             }
         }
@@ -126,6 +121,24 @@ public class Main extends ApplicationAdapter {
                 hoveredTile.building = null;
             }
         }
+
+        // Update all buildings
+        for (int x = 0; x < MAP_WIDTH; x++) {
+            for (int y = 0; y < MAP_HEIGHT; y++) {
+                Tile tile = map[x][y];
+                if (tile.building != null) {
+                    tile.building.update(delta);
+                }
+            }
+        }
+    }
+
+    private void updatePosition(float delta) {
+        handleInput(delta);
+
+        camera.position.x += velocity.x * delta;
+        camera.position.y += velocity.y * delta;
+        camera.update();
     }
 
     // Handles all rendering.
@@ -140,35 +153,65 @@ public class Main extends ApplicationAdapter {
 
         for (int x = 0; x < MAP_WIDTH; x++) {
             for (int y = 0; y < MAP_HEIGHT; y++) {
-                Tile tile = map[x][y];
-
-                // Draw Terrain
-                if (tile.hasResource) {
-                    shapeRenderer.setColor(RESOURCE_COLOR);
-                } else if ((x + y) % 2 == 0) {
-                    shapeRenderer.setColor(GROUND_COLOR_1);
-                } else {
-                    shapeRenderer.setColor(GROUND_COLOR_2);
-                }
-                shapeRenderer.rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-
-                // Draw Building
-                if (tile.building != null) {
-                    if (tile.building instanceof Drill) {
-                        shapeRenderer.setColor(DRILL_COLOR);
-                        shapeRenderer.rect((x * TILE_SIZE) + 4, (y * TILE_SIZE) + 4, TILE_SIZE - 8, TILE_SIZE - 8);
-                    }
-                }
+                drawTile(x, y);
             }
-        }
-
-        if (hoveredTile != null) {
-            shapeRenderer.setColor(HIGHLIGHT_COLOR);
-            shapeRenderer.rect(hoveredTile.x * TILE_SIZE, hoveredTile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         }
 
         shapeRenderer.end();
         Gdx.gl.glDisable(Gdx.gl.GL_BLEND);
+    }
+
+    public void drawTile(int x, int y) {
+        Tile tile = map[x][y];
+
+        // Draw Base
+        if ((x + y) % 2 == 0) {
+            shapeRenderer.setColor(GROUND_COLOR_1);
+        } else {
+            shapeRenderer.setColor(GROUND_COLOR_2);
+        }
+        shapeRenderer.rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+
+        // --- Draw Resources ---
+        switch (tile.type) {
+            case DIRT:
+                // Draw nothing
+                break;
+
+            case COPPER_ORE:
+                shapeRenderer.setColor(RESOURCE_COLOR);
+                float margin = 4;
+                shapeRenderer.rect(
+                    (x * TILE_SIZE) + margin,
+                    (y * TILE_SIZE) + margin,
+                    TILE_SIZE - (margin * 2),
+                    TILE_SIZE - (margin * 2)
+                );
+                break;
+        }
+
+        // Draw Buildings
+        if (tile.building != null) {
+            if (tile.building instanceof Drill) {
+                shapeRenderer.setColor(DRILL_COLOR);
+                float margin = 2;
+                shapeRenderer.rect(
+                    (x * TILE_SIZE) + margin,
+                    (y * TILE_SIZE) + margin,
+                    TILE_SIZE - (margin * 2),
+                    TILE_SIZE - (margin * 2)
+                );
+
+                shapeRenderer.setColor(Color.WHITE);
+                shapeRenderer.rect((x * TILE_SIZE) + 12, (y * TILE_SIZE) + 12, 8, 8);
+            }
+        }
+
+        // Mouse Highlight
+        if (hoveredTile != null) {
+            shapeRenderer.setColor(HIGHLIGHT_COLOR);
+            shapeRenderer.rect(hoveredTile.x * TILE_SIZE, hoveredTile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        }
     }
 
     private void handleInput(float delta) {

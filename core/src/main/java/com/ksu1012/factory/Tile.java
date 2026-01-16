@@ -3,7 +3,7 @@ package com.ksu1012.factory;
 public class Tile {
     public int x, y;
 
-    public boolean hasResource = false;
+    public TerrainType type = TerrainType.DIRT;
 
     public Building building = null;
 

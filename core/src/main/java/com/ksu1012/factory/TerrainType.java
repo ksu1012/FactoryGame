@@ -1,8 +1,8 @@
 package com.ksu1012.factory;
 
-public enum ItemType {
+public enum TerrainType {
+    DIRT,
     COPPER_ORE,
     IRON_ORE,
-    COAL,
-    SAND
+    COAL
 }
