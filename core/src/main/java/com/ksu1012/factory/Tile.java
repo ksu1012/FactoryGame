@@ -5,6 +5,8 @@ public class Tile {
 
     public boolean hasResource = false;
 
+    public Building building = null;
+
     public Tile(int x, int y) {
         this.x = x;
         this.y = y;

@@ -29,6 +29,7 @@ public class Main extends ApplicationAdapter {
     private final Color GROUND_COLOR_2 = new Color(0.18f, 0.18f, 0.18f, 1f);
     private final Color HIGHLIGHT_COLOR = new Color(1f, 1f, 1f, 0.3f); // Semi-transparent white
     private final Color RESOURCE_COLOR = new Color(0.8f, 0.5f, 0.2f, 1f); // Copper-ish color
+    private final Color DRILL_COLOR = new Color(0.4f, 0.8f, 0.4f, 1f); // Green
 
     // --- PHYSICS SETTINGS ---
     private final float ACCELERATION = 4000f;
@@ -84,46 +85,64 @@ public class Main extends ApplicationAdapter {
     public void render() {
         float deltaTime = Gdx.graphics.getDeltaTime();
 
-        // --- PHYSICS LOGIC ---
-        handleInput(deltaTime);
-        camera.position.x += velocity.x * deltaTime;
-        camera.position.y += velocity.y * deltaTime;
+        // Update logic
+        update(deltaTime);
+
+        // Draw visuals
+        draw();
+    }
+
+    // Handles all game logic, physics, and input.
+    private void update(float delta) {
+        // --- PHYSICS ---
+        handleInput(delta);
+
+        camera.position.x += velocity.x * delta;
+        camera.position.y += velocity.y * delta;
         camera.update();
 
-        // --- INTERACTION LOGIC (Mouse Picking) ---
-        // Get raw mouse coordinates (Pixels from bottom-left)
+        // --- MOUSE INPUT ---
         mousePos.set(Gdx.input.getX(), Gdx.input.getY(), 0);
-
-        // "Unproject" converts Screen Pixels -> Game World Coordinates
         camera.unproject(mousePos);
 
-        // Convert World Coordinates -> Grid Index
         int gridX = (int) (mousePos.x / TILE_SIZE);
         int gridY = (int) (mousePos.y / TILE_SIZE);
 
-        // Check bounds
         if (gridX >= 0 && gridX < MAP_WIDTH && gridY >= 0 && gridY < MAP_HEIGHT) {
             hoveredTile = map[gridX][gridY];
         } else {
             hoveredTile = null;
         }
 
-        // --- RENDER LOGIC ---
+        // --- BUILDING PLACEMENT ---
+        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
+            if (hoveredTile != null && hoveredTile.building == null && hoveredTile.hasResource) {
+                hoveredTile.building = new Drill(gridX, gridY);
+            }
+        }
+
+        if (Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT)) {
+            if (hoveredTile != null) {
+                hoveredTile.building = null;
+            }
+        }
+    }
+
+    // Handles all rendering.
+    private void draw() {
         ScreenUtils.clear(0.1f, 0.1f, 0.1f, 1);
 
-        // Enable alpha blending (transparency) for the highlight square
         Gdx.gl.glEnable(Gdx.gl.GL_BLEND);
         Gdx.gl.glBlendFunc(Gdx.gl.GL_SRC_ALPHA, Gdx.gl.GL_ONE_MINUS_SRC_ALPHA);
 
         shapeRenderer.setProjectionMatrix(camera.combined);
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
 
-        // Draw Map
         for (int x = 0; x < MAP_WIDTH; x++) {
             for (int y = 0; y < MAP_HEIGHT; y++) {
                 Tile tile = map[x][y];
 
-                // Color Logic
+                // Draw Terrain
                 if (tile.hasResource) {
                     shapeRenderer.setColor(RESOURCE_COLOR);
                 } else if ((x + y) % 2 == 0) {
@@ -131,20 +150,22 @@ public class Main extends ApplicationAdapter {
                 } else {
                     shapeRenderer.setColor(GROUND_COLOR_2);
                 }
-
                 shapeRenderer.rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+
+                // Draw Building
+                if (tile.building != null) {
+                    if (tile.building instanceof Drill) {
+                        shapeRenderer.setColor(DRILL_COLOR);
+                        shapeRenderer.rect((x * TILE_SIZE) + 4, (y * TILE_SIZE) + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+                    }
+                }
             }
         }
 
-        // Draw Hover Highlight
         if (hoveredTile != null) {
             shapeRenderer.setColor(HIGHLIGHT_COLOR);
             shapeRenderer.rect(hoveredTile.x * TILE_SIZE, hoveredTile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         }
-
-        // Draw Center Dot
-        shapeRenderer.setColor(Color.RED);
-        shapeRenderer.circle(camera.position.x, camera.position.y, 5);
 
         shapeRenderer.end();
         Gdx.gl.glDisable(Gdx.gl.GL_BLEND);
