@@ -12,6 +12,8 @@ import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.ScreenUtils;
 
+import java.util.ArrayList;
+
 public class Main extends ApplicationAdapter {
     private OrthographicCamera camera;
     private ShapeRenderer shapeRenderer;
@@ -23,6 +25,7 @@ public class Main extends ApplicationAdapter {
 
     // --- DATA LAYER ---
     private Tile[][] map; // The actual data storage
+    private ArrayList<Building> buildings = new ArrayList<>(); // Optimization list
 
     // --- VISUAL SETTINGS ---
     private final Color GROUND_COLOR_1 = new Color(0.15f, 0.15f, 0.15f, 1f);
@@ -110,38 +113,39 @@ public class Main extends ApplicationAdapter {
         }
 
         // --- BUILDING PLACEMENT ---
+        // Place a building upon left-clicking if possible
         if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
             if (hoveredTile != null && hoveredTile.building == null && hoveredTile.type == TerrainType.COPPER_ORE) {
-                hoveredTile.building = new Drill(gridX, gridY);
+                Building newDrill = new Drill(gridX, gridY);
+                hoveredTile.building = newDrill;
+                buildings.add(newDrill); // Add to optimization list
             }
         }
 
+        // Remove a building upon right-clicking
         if (Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT)) {
-            if (hoveredTile != null) {
+            if (hoveredTile != null && hoveredTile.building != null) {
+                buildings.remove(hoveredTile.building);
                 hoveredTile.building = null;
             }
         }
 
         // Update all buildings
-        for (int x = 0; x < MAP_WIDTH; x++) {
-            for (int y = 0; y < MAP_HEIGHT; y++) {
-                Tile tile = map[x][y];
-                if (tile.building != null) {
-                    tile.building.update(delta);
-                }
-            }
+        for (Building b : buildings) {
+            Tile tile = map[b.x][b.y];
+            b.update(delta, tile);
         }
     }
 
     private void updatePosition(float delta) {
-        handleInput(delta);
+        calculateVectors(delta);
 
         camera.position.x += velocity.x * delta;
         camera.position.y += velocity.y * delta;
         camera.update();
     }
 
-    // Handles all rendering.
+    // Handles rendering
     private void draw() {
         ScreenUtils.clear(0.1f, 0.1f, 0.1f, 1);
 
@@ -151,8 +155,24 @@ public class Main extends ApplicationAdapter {
         shapeRenderer.setProjectionMatrix(camera.combined);
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
 
-        for (int x = 0; x < MAP_WIDTH; x++) {
-            for (int y = 0; y < MAP_HEIGHT; y++) {
+        // Calculate Visible Range
+        float viewWidth = camera.viewportWidth * camera.zoom;
+        float viewHeight = camera.viewportHeight * camera.zoom;
+
+        int startX = (int) ((camera.position.x - viewWidth / 2) / TILE_SIZE) - 2;
+        int endX = (int) ((camera.position.x + viewWidth / 2) / TILE_SIZE) + 2;
+        int startY = (int) ((camera.position.y - viewHeight / 2) / TILE_SIZE) - 2;
+        int endY = (int) ((camera.position.y + viewHeight / 2) / TILE_SIZE) + 2;
+
+        // Clamp to map bounds
+        startX = Math.max(0, startX);
+        startY = Math.max(0, startY);
+        endX = Math.min(MAP_WIDTH, endX);
+        endY = Math.min(MAP_HEIGHT, endY);
+
+        // Render only visible tiles
+        for (int x = startX; x < endX; x++) {
+            for (int y = startY; y < endY; y++) {
                 drawTile(x, y);
             }
         }
@@ -184,7 +204,7 @@ public class Main extends ApplicationAdapter {
                 // Draw nothing
                 break;
 
-            case COPPER_ORE:
+            case COPPER_ORE: // Draw a slightly smaller square within to show the resource
                 shapeRenderer.setColor(RESOURCE_COLOR);
                 float margin = 4;
                 shapeRenderer.rect(
@@ -210,11 +230,20 @@ public class Main extends ApplicationAdapter {
 
                 shapeRenderer.setColor(Color.WHITE);
                 shapeRenderer.rect((x * TILE_SIZE) + 12, (y * TILE_SIZE) + 12, 8, 8);
+
+                // Visual indicator for contents (temporary)
+                ItemType item = tile.building.getFirstItem();
+
+                if (item != null && tile.building.getItemCount(item) > 0) {
+                    shapeRenderer.setColor(item.color);
+                    shapeRenderer.rect((x * TILE_SIZE) + 14, (y * TILE_SIZE) + 14, 4, 4);
+                }
             }
         }
     }
 
-    private void handleInput(float delta) {
+    // Movement vector calculations
+    private void calculateVectors(float delta) {
         inputVector.set(0, 0);
 
         if (Gdx.input.isKeyPressed(Input.Keys.W)) inputVector.y += 1;
@@ -236,6 +265,7 @@ public class Main extends ApplicationAdapter {
         if (velocity.len() < 10f) {
             velocity.set(0, 0);
         }
+
         velocity.clamp(0, MAX_SPEED);
     }
 
