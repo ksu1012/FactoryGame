@@ -157,6 +157,12 @@ public class Main extends ApplicationAdapter {
             }
         }
 
+        // Highlight tile
+        if (hoveredTile != null) {
+            shapeRenderer.setColor(HIGHLIGHT_COLOR);
+            shapeRenderer.rect(hoveredTile.x * TILE_SIZE, hoveredTile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        }
+
         shapeRenderer.end();
         Gdx.gl.glDisable(Gdx.gl.GL_BLEND);
     }
@@ -205,12 +211,6 @@ public class Main extends ApplicationAdapter {
                 shapeRenderer.setColor(Color.WHITE);
                 shapeRenderer.rect((x * TILE_SIZE) + 12, (y * TILE_SIZE) + 12, 8, 8);
             }
-        }
-
-        // Mouse Highlight
-        if (hoveredTile != null) {
-            shapeRenderer.setColor(HIGHLIGHT_COLOR);
-            shapeRenderer.rect(hoveredTile.x * TILE_SIZE, hoveredTile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         }
     }
 
