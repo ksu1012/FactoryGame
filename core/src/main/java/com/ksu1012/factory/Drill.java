@@ -27,11 +27,7 @@ public class Drill extends Building {
 
     private void mineResource(Tile tile) {
         if (tile.type.minedItem != null) {
-            boolean success = addInternalItem(tile.type.minedItem, 1);
-
-            if (success) {
-                System.out.println("Mined " + tile.type.minedItem);
-            }
+            addInternalItem(tile.type.minedItem, 1);
         }
     }
 }

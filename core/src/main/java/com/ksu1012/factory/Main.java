@@ -26,7 +26,10 @@ public class Main extends ApplicationAdapter {
     // --- DATA LAYER ---
     private Tile[][] map; // The actual data storage
     private ArrayList<Building> buildings = new ArrayList<>(); // Optimization list
+
+    // Selection state
     private Direction currentFacing = Direction.NORTH;
+    private BuildingType selectedBuilding = BuildingType.CONVEYOR;
 
     // --- VISUAL SETTINGS ---
     private final Color GROUND_COLOR_1 = new Color(0.15f, 0.15f, 0.15f, 1f);
@@ -34,6 +37,7 @@ public class Main extends ApplicationAdapter {
     private final Color HIGHLIGHT_COLOR = new Color(1f, 1f, 1f, 0.3f); // Semi-transparent white
     private final Color RESOURCE_COLOR = new Color(0.8f, 0.5f, 0.2f, 1f); // Copper-ish color
     private final Color DRILL_COLOR = new Color(0.4f, 0.8f, 0.4f, 1f); // Green
+    private final Color FACTORY_COLOR = new Color(0.9f, 0.6f, 0.2f, 1f); // Orange
 
     // --- PHYSICS SETTINGS ---
     private final float ACCELERATION = 4000f;
@@ -113,6 +117,20 @@ public class Main extends ApplicationAdapter {
             hoveredTile = null;
         }
 
+        // Selection Input
+        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_1)) {
+            selectedBuilding = BuildingType.CONVEYOR;
+            System.out.println("Selected: Conveyor");
+        }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_2)) {
+            selectedBuilding = BuildingType.DRILL;
+            System.out.println("Selected: Drill");
+        }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_3)) {
+            selectedBuilding = BuildingType.FACTORY;
+            System.out.println("Selected: Factory");
+        }
+
         // --- ROTATION ---
         if (Gdx.input.isKeyJustPressed(Input.Keys.R)) {
             currentFacing = currentFacing.next(); // Rotate Clockwise
@@ -120,29 +138,57 @@ public class Main extends ApplicationAdapter {
 
         // --- PLACEMENT ---
         if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
-            if (hoveredTile != null && hoveredTile.building == null) {
-                Building b = null;
+            // Only allow placement if tile exists and is empty
+            if (hoveredTile != null) {
 
-                // Logic: Ore -> Drill, Dirt -> Conveyor
-                if (hoveredTile.type == TerrainType.COPPER_ORE) {
-                    b = new Drill(gridX, gridY);
-                } else {
-                    b = new Conveyor(gridX, gridY);
+                Building newBuilding = null;
+
+                // Create object to check dimensions
+                switch (selectedBuilding) {
+                    case CONVEYOR:
+                        newBuilding = new Conveyor(gridX, gridY);
+                        break;
+                    case DRILL:
+                        newBuilding = new Drill(gridX, gridY);
+                        break;
+                    case FACTORY:
+                        newBuilding = new Factory(gridX, gridY);
+                        break;
                 }
 
-                // APPLY FACING!
-                b.facing = currentFacing;
+                if (newBuilding != null) {
+                    // Check if footprint is valid (terrain/overlap)
+                    if (canPlaceBuilding(gridX, gridY, newBuilding.width, newBuilding.height)) {
+                        newBuilding.facing = currentFacing; // Apply rotation
+                        buildings.add(newBuilding);
 
-                hoveredTile.building = b;
-                buildings.add(b);
+                        // Occupy all tiles in footprint
+                        for (int i = 0; i < newBuilding.width; i++) {
+                            for (int j = 0; j < newBuilding.height; j++) {
+                                map[gridX + i][gridY + j].building = newBuilding;
+                            }
+                        }
+                    } else {
+                        System.out.println("Cannot build here (Blocked/Invalid)");
+                    }
+                }
             }
         }
 
         // Remove a building upon right-clicking
         if (Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT)) {
             if (hoveredTile != null && hoveredTile.building != null) {
-                buildings.remove(hoveredTile.building);
-                hoveredTile.building = null;
+                Building b = hoveredTile.building;
+                buildings.remove(b);
+
+                // Clear the whole footprint
+                for (int i = 0; i < b.width; i++) {
+                    for (int j = 0; j < b.height; j++) {
+                        if (b.x + i < MAP_WIDTH && b.y + j < MAP_HEIGHT) {
+                            map[b.x + i][b.y + j].building = null;
+                        }
+                    }
+                }
             }
         }
 
@@ -150,6 +196,23 @@ public class Main extends ApplicationAdapter {
         for (Building b : buildings) {
             b.update(delta, map);
         }
+    }
+
+    private boolean canPlaceBuilding(int startX, int startY, int w, int h) {
+        if (startX < 0 || startY < 0 || startX + w > MAP_WIDTH || startY + h > MAP_HEIGHT) {
+            return false;
+        }
+
+        for (int i = 0; i < w; i++) {
+            for (int j = 0; j < h; j++) {
+                Tile t = map[startX + i][startY + j];
+                // Occupied check
+                if (t.building != null) return false;
+                // Terrain check (Liquid check)
+                if (!t.type.isBuildable) return false;
+            }
+        }
+        return true;
     }
 
     private void updatePosition(float delta) {
@@ -185,11 +248,71 @@ public class Main extends ApplicationAdapter {
         endX = Math.min(MAP_WIDTH, endX);
         endY = Math.min(MAP_HEIGHT, endY);
 
-        // Render only visible tiles
+        // Render visible tiles (Ground Layer)
         for (int x = startX; x < endX; x++) {
             for (int y = startY; y < endY; y++) {
-                drawTile(x, y);
+                drawGround(x, y);
             }
+        }
+
+        // Render Buildings (Building Layer)
+        // We iterate the list to ensure large buildings don't clip when their anchor is off-screen
+        for (Building b : buildings) {
+            // Optimization: Simple bound check
+            float bx = b.x * TILE_SIZE;
+            float by = b.y * TILE_SIZE;
+            if (bx + (b.width * TILE_SIZE) > camera.position.x - viewWidth / 2 &&
+                bx < camera.position.x + viewWidth / 2 &&
+                by + (b.height * TILE_SIZE) > camera.position.y - viewHeight / 2 &&
+                by < camera.position.y + viewHeight / 2) {
+
+                drawBuilding(b);
+            }
+        }
+
+        // Preview drawing (Ghost Layer)
+        if (hoveredTile != null && hoveredTile.building == null) {
+            int w = 1, h = 1;
+            if (selectedBuilding == BuildingType.FACTORY) {
+                w = 2; h = 2;
+            }
+
+            boolean isValid = canPlaceBuilding(hoveredTile.x, hoveredTile.y, w, h);
+
+            Gdx.gl.glEnable(Gdx.gl.GL_BLEND);
+            if (isValid) {
+                shapeRenderer.setColor(1f, 1f, 1f, 0.5f); // Valid
+            } else {
+                shapeRenderer.setColor(1f, 0f, 0f, 0.5f); // Invalid
+            }
+
+            int gx = hoveredTile.x * TILE_SIZE;
+            int gy = hoveredTile.y * TILE_SIZE;
+
+            // Draw based on selected type
+            switch (selectedBuilding) {
+                case DRILL:
+                    if (isValid) shapeRenderer.setColor(0.4f, 0.8f, 0.4f, 0.5f);
+                    else shapeRenderer.setColor(1.0f, 0.2f, 0.2f, 0.5f);
+                    break;
+                case CONVEYOR:
+                    if (isValid) shapeRenderer.setColor(0.3f, 0.3f, 0.3f, 0.5f);
+                    else shapeRenderer.setColor(1.0f, 0.0f, 0.0f, 0.5f);
+                    break;
+                case FACTORY: // New
+                    // Ghost for factory is handled by general rect below, just setting color logic
+                    break;
+            }
+
+            shapeRenderer.rect(gx, gy, w * TILE_SIZE, h * TILE_SIZE);
+
+            // Draw Direction Indicator (Ghost Arrow)
+            shapeRenderer.setColor(1f, 1f, 0f, 0.5f); // Yellow
+            float centerX = gx + (w * TILE_SIZE) / 2f;
+            float centerY = gy + (h * TILE_SIZE) / 2f;
+            float dotX = centerX + (currentFacing.dx * h * TILE_SIZE / 2f) - 3;
+            float dotY = centerY + (currentFacing.dy * h * TILE_SIZE / 2f) - 3;
+            shapeRenderer.rect(dotX, dotY, 6, 6);
         }
 
         // Highlight tile
@@ -202,7 +325,7 @@ public class Main extends ApplicationAdapter {
         Gdx.gl.glDisable(Gdx.gl.GL_BLEND);
     }
 
-    public void drawTile(int x, int y) {
+    private void drawGround(int x, int y) {
         Tile tile = map[x][y];
 
         // Draw Base
@@ -214,54 +337,52 @@ public class Main extends ApplicationAdapter {
         shapeRenderer.rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
 
         // --- Draw Resources ---
-        switch (tile.type) {
-            case DIRT:
-                // Draw nothing
-                break;
+        if (tile.type == TerrainType.COPPER_ORE) {
+            shapeRenderer.setColor(RESOURCE_COLOR);
+            float margin = 4;
+            shapeRenderer.rect(
+                (x * TILE_SIZE) + margin,
+                (y * TILE_SIZE) + margin,
+                TILE_SIZE - (margin * 2),
+                TILE_SIZE - (margin * 2)
+            );
+        }
+    }
 
-            case COPPER_ORE: // Draw a slightly smaller square within to show the resource
-                shapeRenderer.setColor(RESOURCE_COLOR);
-                float margin = 4;
-                shapeRenderer.rect(
-                    (x * TILE_SIZE) + margin,
-                    (y * TILE_SIZE) + margin,
-                    TILE_SIZE - (margin * 2),
-                    TILE_SIZE - (margin * 2)
-                );
-                break;
+    private void drawBuilding(Building b) {
+        // --- DRAW BUILDING ---
+        if (b instanceof Drill) {
+            shapeRenderer.setColor(DRILL_COLOR);
+        } else if (b instanceof Conveyor) {
+            shapeRenderer.setColor(Color.DARK_GRAY);
+        } else if (b instanceof Factory) {
+            shapeRenderer.setColor(FACTORY_COLOR);
         }
 
-        // Draw Buildings
-        if (tile.building != null) {
-            Building b = tile.building;
+        // Draw the main box using width/height
+        shapeRenderer.rect(
+            (b.x * TILE_SIZE) + 2,
+            (b.y * TILE_SIZE) + 2,
+            (b.width * TILE_SIZE) - 4,
+            (b.height * TILE_SIZE) - 4
+        );
 
-            // --- DRAW BUILDING ---
-            if (b instanceof Drill) {
-                shapeRenderer.setColor(DRILL_COLOR);
-            } else if (b instanceof Conveyor) {
-                shapeRenderer.setColor(Color.DARK_GRAY);
-            }
+        // --- DRAW DIRECTION INDICATOR (Yellow Dot) ---
+        shapeRenderer.setColor(Color.YELLOW);
+        float centerX = (b.x * TILE_SIZE) + (b.width * TILE_SIZE) / 2f;
+        float centerY = (b.y * TILE_SIZE) + (b.height * TILE_SIZE) / 2f;
 
-            // Draw the main box
-            shapeRenderer.rect((x * TILE_SIZE) + 2, (y * TILE_SIZE) + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+        // Offset the dot based on facing direction (dx/dy)
+        float dotX = centerX + (b.facing.dx * 10) - 3;
+        float dotY = centerY + (b.facing.dy * 10) - 3;
+        shapeRenderer.rect(dotX, dotY, 6, 6);
 
-            // --- DRAW DIRECTION INDICATOR (Yellow Dot) ---
-            shapeRenderer.setColor(Color.YELLOW);
-            float centerX = (x * TILE_SIZE) + TILE_SIZE / 2f;
-            float centerY = (y * TILE_SIZE) + TILE_SIZE / 2f;
-
-            // Offset the dot based on facing direction (dx/dy)
-            float dotX = centerX + (b.facing.dx * 10) - 3;
-            float dotY = centerY + (b.facing.dy * 10) - 3;
-            shapeRenderer.rect(dotX, dotY, 6, 6);
-
-            // --- DRAW ITEMS ---
-            ItemType item = b.getFirstItem();
-            if (item != null) {
-                shapeRenderer.setColor(item.color);
-                // Draw item slightly smaller in center
-                shapeRenderer.rect(centerX - 4, centerY - 4, 8, 8);
-            }
+        // --- DRAW ITEMS ---
+        ItemType item = b.getFirstItem();
+        if (item != null) {
+            shapeRenderer.setColor(item.color);
+            // Draw item slightly smaller in center
+            shapeRenderer.rect(centerX - 4, centerY - 4, 8, 8);
         }
     }
 

@@ -5,6 +5,8 @@ import java.util.HashSet;
 
 public abstract class Building {
     public int x, y;
+    public int width = 1;
+    public int height = 1;
     public Direction facing = Direction.NORTH;
 
     protected HashMap<ItemType, Integer> inventory = new HashMap<>();
