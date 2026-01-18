@@ -26,6 +26,7 @@ public class Main extends ApplicationAdapter {
     // --- DATA LAYER ---
     private Tile[][] map; // The actual data storage
     private ArrayList<Building> buildings = new ArrayList<>(); // Optimization list
+    private Direction currentFacing = Direction.NORTH;
 
     // --- VISUAL SETTINGS ---
     private final Color GROUND_COLOR_1 = new Color(0.15f, 0.15f, 0.15f, 1f);
@@ -112,13 +113,28 @@ public class Main extends ApplicationAdapter {
             hoveredTile = null;
         }
 
-        // --- BUILDING PLACEMENT ---
-        // Place a building upon left-clicking if possible
+        // --- ROTATION ---
+        if (Gdx.input.isKeyJustPressed(Input.Keys.R)) {
+            currentFacing = currentFacing.next(); // Rotate Clockwise
+        }
+
+        // --- PLACEMENT ---
         if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
-            if (hoveredTile != null && hoveredTile.building == null && hoveredTile.type == TerrainType.COPPER_ORE) {
-                Building newDrill = new Drill(gridX, gridY);
-                hoveredTile.building = newDrill;
-                buildings.add(newDrill); // Add to optimization list
+            if (hoveredTile != null && hoveredTile.building == null) {
+                Building b = null;
+
+                // Logic: Ore -> Drill, Dirt -> Conveyor
+                if (hoveredTile.type == TerrainType.COPPER_ORE) {
+                    b = new Drill(gridX, gridY);
+                } else {
+                    b = new Conveyor(gridX, gridY);
+                }
+
+                // APPLY FACING!
+                b.facing = currentFacing;
+
+                hoveredTile.building = b;
+                buildings.add(b);
             }
         }
 
@@ -132,8 +148,7 @@ public class Main extends ApplicationAdapter {
 
         // Update all buildings
         for (Building b : buildings) {
-            Tile tile = map[b.x][b.y];
-            b.update(delta, tile);
+            b.update(delta, map);
         }
     }
 
@@ -218,26 +233,34 @@ public class Main extends ApplicationAdapter {
 
         // Draw Buildings
         if (tile.building != null) {
-            if (tile.building instanceof Drill) {
+            Building b = tile.building;
+
+            // --- DRAW BUILDING ---
+            if (b instanceof Drill) {
                 shapeRenderer.setColor(DRILL_COLOR);
-                float margin = 2;
-                shapeRenderer.rect(
-                    (x * TILE_SIZE) + margin,
-                    (y * TILE_SIZE) + margin,
-                    TILE_SIZE - (margin * 2),
-                    TILE_SIZE - (margin * 2)
-                );
+            } else if (b instanceof Conveyor) {
+                shapeRenderer.setColor(Color.DARK_GRAY);
+            }
 
-                shapeRenderer.setColor(Color.WHITE);
-                shapeRenderer.rect((x * TILE_SIZE) + 12, (y * TILE_SIZE) + 12, 8, 8);
+            // Draw the main box
+            shapeRenderer.rect((x * TILE_SIZE) + 2, (y * TILE_SIZE) + 2, TILE_SIZE - 4, TILE_SIZE - 4);
 
-                // Visual indicator for contents (temporary)
-                ItemType item = tile.building.getFirstItem();
+            // --- DRAW DIRECTION INDICATOR (Yellow Dot) ---
+            shapeRenderer.setColor(Color.YELLOW);
+            float centerX = (x * TILE_SIZE) + TILE_SIZE / 2f;
+            float centerY = (y * TILE_SIZE) + TILE_SIZE / 2f;
 
-                if (item != null && tile.building.getItemCount(item) > 0) {
-                    shapeRenderer.setColor(item.color);
-                    shapeRenderer.rect((x * TILE_SIZE) + 14, (y * TILE_SIZE) + 14, 4, 4);
-                }
+            // Offset the dot based on facing direction (dx/dy)
+            float dotX = centerX + (b.facing.dx * 10) - 3;
+            float dotY = centerY + (b.facing.dy * 10) - 3;
+            shapeRenderer.rect(dotX, dotY, 6, 6);
+
+            // --- DRAW ITEMS ---
+            ItemType item = b.getFirstItem();
+            if (item != null) {
+                shapeRenderer.setColor(item.color);
+                // Draw item slightly smaller in center
+                shapeRenderer.rect(centerX - 4, centerY - 4, 8, 8);
             }
         }
     }
