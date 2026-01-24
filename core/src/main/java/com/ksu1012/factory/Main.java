@@ -34,6 +34,10 @@ public class Main extends ApplicationAdapter {
     // --- VISUAL SETTINGS ---
     private final Color GROUND_COLOR_1 = new Color(0.15f, 0.15f, 0.15f, 1f);
     private final Color GROUND_COLOR_2 = new Color(0.18f, 0.18f, 0.18f, 1f);
+    private final Color WALL_COLOR = new Color(0.05f, 0.05f, 0.05f, 1f); // Dark Grey/Black
+    private final Color WATER_COLOR = new Color(0.2f, 0.4f, 0.8f, 1f);   // Blue
+    private final Color LAVA_COLOR = new Color(0.8f, 0.2f, 0.1f, 1f);    // Red
+
     private final Color HIGHLIGHT_COLOR = new Color(1f, 1f, 1f, 0.3f); // Semi-transparent white
     private final Color RESOURCE_COLOR = new Color(0.8f, 0.5f, 0.2f, 1f); // Copper-ish color
     private final Color DRILL_COLOR = new Color(0.4f, 0.8f, 0.4f, 1f); // Green
@@ -58,18 +62,9 @@ public class Main extends ApplicationAdapter {
         camera.position.set(MAP_WIDTH * TILE_SIZE / 2f, MAP_HEIGHT * TILE_SIZE / 2f, 0);
         shapeRenderer = new ShapeRenderer();
 
-        // --- INITIALIZE MAP DATA ---
-        map = new Tile[MAP_WIDTH][MAP_HEIGHT];
-        for (int x = 0; x < MAP_WIDTH; x++) {
-            for (int y = 0; y < MAP_HEIGHT; y++) {
-                map[x][y] = new Tile(x, y);
-
-                // Temp: Randomly scatter some resources
-                if (Math.random() < 0.1) { // 10% chance
-                    map[x][y].type = TerrainType.COPPER_ORE;
-                }
-            }
-        }
+        // --- MAP GENERATION ---
+        WorldGenerator generator = new WorldGenerator(MAP_WIDTH, MAP_HEIGHT);
+        this.map = generator.generate();
 
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override
@@ -158,7 +153,7 @@ public class Main extends ApplicationAdapter {
 
                 if (newBuilding != null) {
                     // Check if footprint is valid (terrain/overlap)
-                    if (canPlaceBuilding(gridX, gridY, newBuilding.width, newBuilding.height)) {
+                    if (canPlaceBuilding(gridX, gridY, newBuilding)) {
                         newBuilding.facing = currentFacing; // Apply rotation
                         buildings.add(newBuilding);
 
@@ -198,18 +193,20 @@ public class Main extends ApplicationAdapter {
         }
     }
 
-    private boolean canPlaceBuilding(int startX, int startY, int w, int h) {
-        if (startX < 0 || startY < 0 || startX + w > MAP_WIDTH || startY + h > MAP_HEIGHT) {
+    // Check against bounds, occupancy, and Building's own terrain rules
+    private boolean canPlaceBuilding(int startX, int startY, Building building) {
+        if (startX < 0 || startY < 0 || startX + building.width > MAP_WIDTH || startY + building.height > MAP_HEIGHT) {
             return false;
         }
 
-        for (int i = 0; i < w; i++) {
-            for (int j = 0; j < h; j++) {
+        for (int i = 0; i < building.width; i++) {
+            for (int j = 0; j < building.height; j++) {
                 Tile t = map[startX + i][startY + j];
                 // Occupied check
                 if (t.building != null) return false;
-                // Terrain check (Liquid check)
-                if (!t.type.isBuildable) return false;
+
+                // Terrain check
+                if (!building.canBuildOn(t.terrain)) return false;
             }
         }
         return true;
@@ -272,47 +269,36 @@ public class Main extends ApplicationAdapter {
 
         // Preview drawing (Ghost Layer)
         if (hoveredTile != null && hoveredTile.building == null) {
-            int w = 1, h = 1;
-            if (selectedBuilding == BuildingType.FACTORY) {
-                w = 2; h = 2;
-            }
-
-            boolean isValid = canPlaceBuilding(hoveredTile.x, hoveredTile.y, w, h);
-
-            Gdx.gl.glEnable(Gdx.gl.GL_BLEND);
-            if (isValid) {
-                shapeRenderer.setColor(1f, 1f, 1f, 0.5f); // Valid
-            } else {
-                shapeRenderer.setColor(1f, 0f, 0f, 0.5f); // Invalid
-            }
-
-            int gx = hoveredTile.x * TILE_SIZE;
-            int gy = hoveredTile.y * TILE_SIZE;
-
-            // Draw based on selected type
+            Building temp = null;
             switch (selectedBuilding) {
-                case DRILL:
-                    if (isValid) shapeRenderer.setColor(0.4f, 0.8f, 0.4f, 0.5f);
-                    else shapeRenderer.setColor(1.0f, 0.2f, 0.2f, 0.5f);
-                    break;
-                case CONVEYOR:
-                    if (isValid) shapeRenderer.setColor(0.3f, 0.3f, 0.3f, 0.5f);
-                    else shapeRenderer.setColor(1.0f, 0.0f, 0.0f, 0.5f);
-                    break;
-                case FACTORY: // New
-                    // Ghost for factory is handled by general rect below, just setting color logic
-                    break;
+                case CONVEYOR: temp = new Conveyor(hoveredTile.x, hoveredTile.y); break;
+                case DRILL:    temp = new Drill(hoveredTile.x, hoveredTile.y); break;
+                case FACTORY:  temp = new Factory(hoveredTile.x, hoveredTile.y); break;
             }
 
-            shapeRenderer.rect(gx, gy, w * TILE_SIZE, h * TILE_SIZE);
+            if (temp != null) {
+                // Pass temp building to check against its terrain rules
+                boolean isValid = canPlaceBuilding(hoveredTile.x, hoveredTile.y, temp);
 
-            // Draw Direction Indicator (Ghost Arrow)
-            shapeRenderer.setColor(1f, 1f, 0f, 0.5f); // Yellow
-            float centerX = gx + (w * TILE_SIZE) / 2f;
-            float centerY = gy + (h * TILE_SIZE) / 2f;
-            float dotX = centerX + (currentFacing.dx * h * TILE_SIZE / 2f) - 3;
-            float dotY = centerY + (currentFacing.dy * h * TILE_SIZE / 2f) - 3;
-            shapeRenderer.rect(dotX, dotY, 6, 6);
+                Gdx.gl.glEnable(Gdx.gl.GL_BLEND);
+                if (isValid) {
+                    shapeRenderer.setColor(1f, 1f, 1f, 0.5f); // Valid
+                } else {
+                    shapeRenderer.setColor(1f, 0f, 0f, 0.5f); // Invalid
+                }
+
+                int gx = hoveredTile.x * TILE_SIZE;
+                int gy = hoveredTile.y * TILE_SIZE;
+                shapeRenderer.rect(gx, gy, temp.width * TILE_SIZE, temp.height * TILE_SIZE);
+
+                // Draw Direction Indicator
+                shapeRenderer.setColor(Color.YELLOW);
+                float centerX = gx + (temp.width * TILE_SIZE) / 2f;
+                float centerY = gy + (temp.height * TILE_SIZE) / 2f;
+                float dotX = centerX + (currentFacing.dx * temp.width * TILE_SIZE / 2f) - 3;
+                float dotY = centerY + (currentFacing.dy * temp.width * TILE_SIZE / 2f) - 3;
+                shapeRenderer.rect(dotX, dotY, 6, 6);
+            }
         }
 
         // Highlight tile
@@ -328,17 +314,30 @@ public class Main extends ApplicationAdapter {
     private void drawGround(int x, int y) {
         Tile tile = map[x][y];
 
-        // Draw Base
-        if ((x + y) % 2 == 0) {
-            shapeRenderer.setColor(GROUND_COLOR_1);
-        } else {
-            shapeRenderer.setColor(GROUND_COLOR_2);
+        // Draw base terrain
+        switch(tile.terrain) {
+            case DIRT:
+                if ((x + y) % 2 == 0) shapeRenderer.setColor(GROUND_COLOR_1);
+                else shapeRenderer.setColor(GROUND_COLOR_2);
+                break;
+            case WALL:
+                shapeRenderer.setColor(WALL_COLOR);
+                break;
+            case WATER:
+                shapeRenderer.setColor(WATER_COLOR);
+                break;
+            case LAVA:
+                shapeRenderer.setColor(LAVA_COLOR);
+                break;
         }
         shapeRenderer.rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
 
-        // --- Draw Resources ---
-        if (tile.type == TerrainType.COPPER_ORE) {
-            shapeRenderer.setColor(RESOURCE_COLOR);
+        // Draw resource
+        if (tile.resource != null) {
+            if (tile.resource == ResourceType.COPPER_ORE) {
+                shapeRenderer.setColor(RESOURCE_COLOR);
+            }
+
             float margin = 4;
             shapeRenderer.rect(
                 (x * TILE_SIZE) + margin,
@@ -386,7 +385,6 @@ public class Main extends ApplicationAdapter {
         }
     }
 
-    // Movement vector calculations
     private void calculateVectors(float delta) {
         inputVector.set(0, 0);
 

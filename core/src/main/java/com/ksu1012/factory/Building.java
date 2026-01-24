@@ -22,12 +22,23 @@ public abstract class Building {
     protected HashSet<ItemType> acceptedItems = new HashSet<>();
     protected boolean acceptsAll = false;
 
+    // Types of terrain the Building can be placed on
+    protected HashSet<TerrainType> validTerrain = new HashSet<>();
+
     public Building(int x, int y) {
         this.x = x;
         this.y = y;
+
+        // Allow building on dirt by default
+        validTerrain.add(TerrainType.DIRT);
     }
 
     public abstract void update(float delta, Tile[][] grid);
+
+    // Check if Building can be placed on the terrain below
+    public boolean canBuildOn(TerrainType terrain) {
+        return validTerrain.contains(terrain);
+    }
 
     // Move an item from this Building to the one in front. Returns true if successful
     protected boolean tryPushItem(Tile[][] grid) {

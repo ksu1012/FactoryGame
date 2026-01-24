@@ -1,20 +1,18 @@
 package com.ksu1012.factory;
 
 public enum TerrainType {
-    // Ground
-    DIRT(null, true),
-    COPPER_ORE(ItemType.COPPER_ORE, true),
-    IRON_ORE(ItemType.IRON_ORE, true),
+    // true if buildable by default, false for special cases
+    DIRT(true),
+    SAND(true),  // Example of a future addition
+    GRASS(true), // Example of a future addition
 
-    // Liquids/Obstacles (Not Buildable for normal machines)
-    WATER(null, false),
-    LAVA(null, false);
+    WATER(false),
+    LAVA(false),
+    WALL(false);
 
-    public final ItemType minedItem;
-    public final boolean isBuildable; // true = solid ground, false = liquid/wall
+    public final boolean isBuildable;
 
-    TerrainType(ItemType minedItem, boolean isBuildable) {
-        this.minedItem = minedItem;
+    TerrainType(boolean isBuildable) {
         this.isBuildable = isBuildable;
     }
 }
