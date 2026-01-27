@@ -2,23 +2,26 @@ package com.ksu1012.factory;
 
 public class Conveyor extends Building {
     private float moveTimer = 0f;
-    private final float MOVE_SPEED = 0.2f; // Time in seconds to move one item
+    private float moveSpeed;
 
-    public Conveyor(int x, int y) {
+    // Constructor takes the Definition now!
+    public Conveyor(int x, int y, ConveyorDef def) {
         super(x, y);
-        setGlobalCap(1);        // Holds 1 item
+        this.width = def.width;
+        this.height = def.height;
+        this.moveSpeed = def.speed;
+
+        setGlobalCap(1); // Holds 1 item
         setAcceptsAnyItem(true); // Accepts anything
     }
 
     @Override
     public void update(float delta, Tile[][] grid) {
-        // If we have an item, try to move it
         if (currentTotalItemCount > 0) {
             moveTimer += delta;
-
-            if (moveTimer >= MOVE_SPEED) {
+            if (moveTimer >= moveSpeed) {
                 if (tryPushItem(grid)) {
-                    moveTimer -= MOVE_SPEED;
+                    moveTimer -= moveSpeed;
                 }
             }
         } else {

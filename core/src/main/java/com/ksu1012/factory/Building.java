@@ -40,62 +40,90 @@ public abstract class Building {
         return validTerrain.contains(terrain);
     }
 
-    // Move an item from this Building to the one in front. Returns true if successful
+    // Pushes the first item in line
     protected boolean tryPushItem(Tile[][] grid) {
-        if (inventory.isEmpty()) return false;
+        return tryPushItem(grid, getFirstItem());
+    }
 
-        // Coordinates of the tile in front
-        int targetX = x + facing.dx;
-        int targetY = y + facing.dy;
+    // Move a specific item from this Building to the one in front. Returns true if successful
+    protected boolean tryPushItem(Tile[][] grid, ItemType itemToMove) {
+        if (itemToMove == null || inventory.getOrDefault(itemToMove, 0) <= 0) return false;
 
-        // Check Bounds
-        if (targetX < 0 || targetX >= grid.length || targetY < 0 || targetY >= grid[0].length) {
-            return false;
-        }
+        // Determine loop limits based on orientation
+        boolean isVertical = (facing == Direction.NORTH || facing == Direction.SOUTH);
+        int limit = isVertical ? width : height;
 
-        // Check neighboring Building
-        Building neighbor = grid[targetX][targetY].building;
-        if (neighbor != null) {
-            ItemType itemToMove = getFirstItem();
+        // Loop through output edge
+        for (int i = 0; i < limit; i++) {
+            int targetX = x;
+            int targetY = y;
 
-            // Try to insert
-            if (neighbor.addItem(itemToMove, 1)) {
-                // Remove from current building if successful
-                inventory.put(itemToMove, inventory.get(itemToMove) - 1);
-                if (inventory.get(itemToMove) <= 0) inventory.remove(itemToMove);
-                currentTotalItemCount--;
-                return true;
+            switch (facing) {
+                case NORTH: targetX = x + i; targetY = y + height; break;
+                case SOUTH: targetX = x + i; targetY = y - 1; break;
+                case EAST:  targetX = x + width; targetY = y + i; break;
+                case WEST:  targetX = x - 1; targetY = y + i; break;
+            }
+
+            if (targetX < 0 || targetX >= grid.length || targetY < 0 || targetY >= grid[0].length) {
+                continue;
+            }
+
+            Building neighbor = grid[targetX][targetY].building;
+            if (neighbor != null) {
+                // Try to insert the SPECIFIC item we asked for
+                if (neighbor.addItem(itemToMove, 1, this.facing)) {
+                    inventory.put(itemToMove, inventory.get(itemToMove) - 1);
+                    if (inventory.get(itemToMove) <= 0) inventory.remove(itemToMove);
+                    currentTotalItemCount--;
+                    return true;
+                }
             }
         }
         return false;
     }
 
-    // Tries to add an item from an EXTERNAL source.
-    public boolean addItem(ItemType type, int amount) {
-        if (!acceptsItem(type)) return false;
+    public boolean addItem(ItemType type, int amount, Direction incomingDirection) {
+
+        // Block items coming from the direction this Building is facing
+        if (incomingDirection == this.facing.opposite()) {
+            return false;
+        }
+
+        // Filter Check
+        if (!acceptsItem(type)) {
+            System.out.println("Rejected " + type + ". Allowed: " + acceptedItems);
+            return false;
+        }
+
         return addInternalItem(type, amount);
+    }
+
+    // Override to ignore direction check
+    public boolean addItem(ItemType type, int amount) {
+        return addItem(type, amount, this.facing);
     }
 
     // Internal logic that checks both the Global Max and the Individual Max.
     protected boolean addInternalItem(ItemType type, int amount) {
-        // Check Global Limit
-        if (globalMax != -1) {
-            if (currentTotalItemCount + amount > globalMax) {
-                return false; // Collective limit reached
-            }
-        }
-
-        // Check Individual Limit (if it exists for this specific item)
+        // Check Item-Specific limit
         if (itemMaxes.containsKey(type)) {
             int currentSpecific = inventory.getOrDefault(type, 0);
             int maxSpecific = itemMaxes.get(type);
 
             if (currentSpecific + amount > maxSpecific) {
-                return false; // Specific slot limit reached
+                return false;
             }
         }
 
-        // Add the item if checks passed
+        // Check global limit
+        else if (globalMax != -1) {
+            if (currentTotalItemCount + amount > globalMax) {
+                return false;
+            }
+        }
+
+        // Add the item
         inventory.put(type, inventory.getOrDefault(type, 0) + amount);
         currentTotalItemCount += amount;
         return true;

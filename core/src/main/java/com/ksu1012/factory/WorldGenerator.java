@@ -28,8 +28,8 @@ public class WorldGenerator {
 
                 // Randomly generate terrain, to be replaced with Perlin noise
                 if (random < 0.05) map[x][y].terrain = TerrainType.WALL;
-                else if (random < 0.15) map[x][y].terrain = TerrainType.WATER;
-                else if (random < 0.18) map[x][y].terrain = TerrainType.LAVA;
+                else if (random < 0.1) map[x][y].terrain = TerrainType.WATER;
+                else if (random < 0.12) map[x][y].terrain = TerrainType.LAVA;
                 else {
                     map[x][y].terrain = TerrainType.DIRT;
                 }
@@ -44,14 +44,19 @@ public class WorldGenerator {
 
                 // Temporary logic for generating ores on land
                 if (tile.terrain.isBuildable) {
-
-                    if (MathUtils.randomBoolean(0.08f)) { // 8% chance
+                    float random = MathUtils.random();
+                    if (random < 0.08) { // 8% chance
                         tile.resource = ResourceType.COPPER_ORE;
-                    } // add else-ifs to add more resources in the future
+                    } else if (random < 0.16) {
+                        tile.resource = ResourceType.IRON_ORE;
+                    } else if (random < 0.24) {
+                        tile.resource = ResourceType.COAL;
+                    }
                 }
 
                 // placeholder for special case checks in the future
                 else if (tile.terrain == TerrainType.WATER) {
+
                 }
             }
         }

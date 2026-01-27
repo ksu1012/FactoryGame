@@ -3,31 +3,35 @@ package com.ksu1012.factory;
 public class Drill extends Building {
 
     private float timer = 0f;
-    private float miningSpeed = 1.0f; // Seconds per item
+    private float miningSpeed;
+    private int quantity;
 
-    public Drill(int x, int y) {
+    public Drill(int x, int y, DrillDef def) {
         super(x, y);
-        setGlobalCap(10); // Stores 10 items max before stopping
+        this.width = def.width;
+        this.height = def.height;
+        this.miningSpeed = def.miningSpeed;
+        this.quantity = def.quantity;
+
+        setGlobalCap(10); // Stores up to 10 items
     }
 
     @Override
     public void update(float delta, Tile[][] grid) {
-        // Mining
         timer += delta;
         if (timer >= miningSpeed) {
             timer -= miningSpeed;
-            Tile tile = grid[x][y];
-            mineResource(tile);
-        }
 
-        // Attempt to output the inventory
+            // In the future, scale mining speed with how many ore tiles the drill is over
+            Tile myTile = grid[x][y];
+            mineResource(myTile);
+        }
         tryPushItem(grid);
     }
 
     private void mineResource(Tile tile) {
-        // Check resource layer of the Tile
         if (tile.resource != null) {
-            addInternalItem(tile.resource.minedItem, 1);
+            addInternalItem(tile.resource.minedItem, quantity);
         }
     }
 }

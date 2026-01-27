@@ -29,17 +29,10 @@ public class Main extends ApplicationAdapter {
 
     // Selection state
     private Direction currentFacing = Direction.NORTH;
-    private BuildingType selectedBuilding = BuildingType.CONVEYOR;
+    private BuildingType selectedBuilding = BuildingType.BASIC_CONVEYOR;
 
     // --- VISUAL SETTINGS ---
-    private final Color GROUND_COLOR_1 = new Color(0.15f, 0.15f, 0.15f, 1f);
-    private final Color GROUND_COLOR_2 = new Color(0.18f, 0.18f, 0.18f, 1f);
-    private final Color WALL_COLOR = new Color(0.05f, 0.05f, 0.05f, 1f); // Dark Grey/Black
-    private final Color WATER_COLOR = new Color(0.2f, 0.4f, 0.8f, 1f);   // Blue
-    private final Color LAVA_COLOR = new Color(0.8f, 0.2f, 0.1f, 1f);    // Red
-
     private final Color HIGHLIGHT_COLOR = new Color(1f, 1f, 1f, 0.3f); // Semi-transparent white
-    private final Color RESOURCE_COLOR = new Color(0.8f, 0.5f, 0.2f, 1f); // Copper-ish color
     private final Color DRILL_COLOR = new Color(0.4f, 0.8f, 0.4f, 1f); // Green
     private final Color FACTORY_COLOR = new Color(0.9f, 0.6f, 0.2f, 1f); // Orange
 
@@ -113,18 +106,11 @@ public class Main extends ApplicationAdapter {
         }
 
         // Selection Input
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_1)) {
-            selectedBuilding = BuildingType.CONVEYOR;
-            System.out.println("Selected: Conveyor");
-        }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_2)) {
-            selectedBuilding = BuildingType.DRILL;
-            System.out.println("Selected: Drill");
-        }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_3)) {
-            selectedBuilding = BuildingType.FACTORY;
-            System.out.println("Selected: Factory");
-        }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_1)) selectedBuilding = BuildingType.BASIC_CONVEYOR;
+        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_2)) selectedBuilding = BuildingType.FAST_CONVEYOR;
+        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_3)) selectedBuilding = BuildingType.BASIC_DRILL;
+        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_4)) selectedBuilding = BuildingType.LARGE_DRILL;
+        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_5)) selectedBuilding = BuildingType.SMELTER;
 
         // --- ROTATION ---
         if (Gdx.input.isKeyJustPressed(Input.Keys.R)) {
@@ -133,38 +119,24 @@ public class Main extends ApplicationAdapter {
 
         // --- PLACEMENT ---
         if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
-            // Only allow placement if tile exists and is empty
             if (hoveredTile != null) {
+                int w = selectedBuilding.def.width;
+                int h = selectedBuilding.def.height;
 
-                Building newBuilding = null;
-
-                // Create object to check dimensions
-                switch (selectedBuilding) {
-                    case CONVEYOR:
-                        newBuilding = new Conveyor(gridX, gridY);
-                        break;
-                    case DRILL:
-                        newBuilding = new Drill(gridX, gridY);
-                        break;
-                    case FACTORY:
-                        newBuilding = new Factory(gridX, gridY);
-                        break;
-                }
+                // Instantiate using the Helper
+                Building newBuilding = BuildingFactory.createBuilding(gridX, gridY, selectedBuilding);
 
                 if (newBuilding != null) {
-                    // Check if footprint is valid (terrain/overlap)
+                    // Check Footprint
                     if (canPlaceBuilding(gridX, gridY, newBuilding)) {
-                        newBuilding.facing = currentFacing; // Apply rotation
+                        newBuilding.facing = currentFacing;
                         buildings.add(newBuilding);
 
-                        // Occupy all tiles in footprint
-                        for (int i = 0; i < newBuilding.width; i++) {
-                            for (int j = 0; j < newBuilding.height; j++) {
+                        for (int i = 0; i < w; i++) {
+                            for (int j = 0; j < h; j++) {
                                 map[gridX + i][gridY + j].building = newBuilding;
                             }
                         }
-                    } else {
-                        System.out.println("Cannot build here (Blocked/Invalid)");
                     }
                 }
             }
@@ -245,17 +217,15 @@ public class Main extends ApplicationAdapter {
         endX = Math.min(MAP_WIDTH, endX);
         endY = Math.min(MAP_HEIGHT, endY);
 
-        // Render visible tiles (Ground Layer)
+        // Render visible tiles
         for (int x = startX; x < endX; x++) {
             for (int y = startY; y < endY; y++) {
                 drawGround(x, y);
             }
         }
 
-        // Render Buildings (Building Layer)
-        // We iterate the list to ensure large buildings don't clip when their anchor is off-screen
+        // Render Buildings
         for (Building b : buildings) {
-            // Optimization: Simple bound check
             float bx = b.x * TILE_SIZE;
             float by = b.y * TILE_SIZE;
             if (bx + (b.width * TILE_SIZE) > camera.position.x - viewWidth / 2 &&
@@ -269,34 +239,43 @@ public class Main extends ApplicationAdapter {
 
         // Preview drawing (Ghost Layer)
         if (hoveredTile != null && hoveredTile.building == null) {
-            Building temp = null;
-            switch (selectedBuilding) {
-                case CONVEYOR: temp = new Conveyor(hoveredTile.x, hoveredTile.y); break;
-                case DRILL:    temp = new Drill(hoveredTile.x, hoveredTile.y); break;
-                case FACTORY:  temp = new Factory(hoveredTile.x, hoveredTile.y); break;
-            }
+
+            // Create temporary ghost building
+            Building temp = BuildingFactory.createBuilding(hoveredTile.x, hoveredTile.y, selectedBuilding);
 
             if (temp != null) {
-                // Pass temp building to check against its terrain rules
+                // Apply rotation
+                temp.facing = currentFacing;
+
+                // Check placement validity
                 boolean isValid = canPlaceBuilding(hoveredTile.x, hoveredTile.y, temp);
 
                 Gdx.gl.glEnable(Gdx.gl.GL_BLEND);
+
+                // Choose color based on validity (red if invalid, white if not)
                 if (isValid) {
-                    shapeRenderer.setColor(1f, 1f, 1f, 0.5f); // Valid
+                    shapeRenderer.setColor(1f, 1f, 1f, 0.5f);
                 } else {
-                    shapeRenderer.setColor(1f, 0f, 0f, 0.5f); // Invalid
+                    shapeRenderer.setColor(1f, 0f, 0f, 0.5f);
                 }
 
                 int gx = hoveredTile.x * TILE_SIZE;
                 int gy = hoveredTile.y * TILE_SIZE;
+
+                // Draw over placement area
                 shapeRenderer.rect(gx, gy, temp.width * TILE_SIZE, temp.height * TILE_SIZE);
 
-                // Draw Direction Indicator
-                shapeRenderer.setColor(Color.YELLOW);
+                // Draw direction indicator
+                shapeRenderer.setColor(1f, 1f, 0f, 0.5f);
+
+                // Calculate center based on building size
                 float centerX = gx + (temp.width * TILE_SIZE) / 2f;
                 float centerY = gy + (temp.height * TILE_SIZE) / 2f;
+
+                // Offset dot based on current rotation
                 float dotX = centerX + (currentFacing.dx * temp.width * TILE_SIZE / 2f) - 3;
-                float dotY = centerY + (currentFacing.dy * temp.width * TILE_SIZE / 2f) - 3;
+                float dotY = centerY + (currentFacing.dy * temp.height * TILE_SIZE / 2f) - 3;
+
                 shapeRenderer.rect(dotX, dotY, 6, 6);
             }
         }
@@ -314,29 +293,18 @@ public class Main extends ApplicationAdapter {
     private void drawGround(int x, int y) {
         Tile tile = map[x][y];
 
-        // Draw base terrain
-        switch(tile.terrain) {
-            case DIRT:
-                if ((x + y) % 2 == 0) shapeRenderer.setColor(GROUND_COLOR_1);
-                else shapeRenderer.setColor(GROUND_COLOR_2);
-                break;
-            case WALL:
-                shapeRenderer.setColor(WALL_COLOR);
-                break;
-            case WATER:
-                shapeRenderer.setColor(WATER_COLOR);
-                break;
-            case LAVA:
-                shapeRenderer.setColor(LAVA_COLOR);
-                break;
+        // Base Terrain layer
+        if ((x + y) % 2 == 0) { // Checkerboard
+            shapeRenderer.setColor(tile.terrain.color1);
+        } else {
+            shapeRenderer.setColor(tile.terrain.color2);
         }
+
         shapeRenderer.rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
 
-        // Draw resource
+        // Resource Layer
         if (tile.resource != null) {
-            if (tile.resource == ResourceType.COPPER_ORE) {
-                shapeRenderer.setColor(RESOURCE_COLOR);
-            }
+            shapeRenderer.setColor(tile.resource.color);
 
             float margin = 4;
             shapeRenderer.rect(
