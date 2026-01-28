@@ -154,4 +154,7 @@ public abstract class Building {
         itemMaxes.put(type, max);
     }
 
+    public void onPlaced(Tile[][] grid) {
+        // Override in subclasses
+    }
 }

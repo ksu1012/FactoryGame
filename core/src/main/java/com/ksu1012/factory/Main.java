@@ -127,16 +127,23 @@ public class Main extends ApplicationAdapter {
                 Building newBuilding = BuildingFactory.createBuilding(gridX, gridY, selectedBuilding);
 
                 if (newBuilding != null) {
-                    // Check Footprint
                     if (canPlaceBuilding(gridX, gridY, newBuilding)) {
                         newBuilding.facing = currentFacing;
                         buildings.add(newBuilding);
 
-                        for (int i = 0; i < w; i++) {
-                            for (int j = 0; j < h; j++) {
+                        // Fill Footprint
+                        for (int i = 0; i < newBuilding.width; i++) {
+                            for (int j = 0; j < newBuilding.height; j++) {
                                 map[gridX + i][gridY + j].building = newBuilding;
                             }
                         }
+
+                        // --- CLEAN & POLYMORPHIC ---
+                        // Every building gets a chance to scan the map now.
+                        newBuilding.onPlaced(map);
+
+                    } else {
+                        System.out.println("Cannot build here");
                     }
                 }
             }

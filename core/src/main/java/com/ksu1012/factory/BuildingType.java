@@ -7,7 +7,7 @@ public enum BuildingType {
 
     // --- DRILLS ---
     BASIC_DRILL(new DrillDef(1, 1, 1.0f, 1)),
-    LARGE_DRILL(new DrillDef(2, 2, 0.8f, 4)), // 2x2, twice as fast and produces 4x.
+    LARGE_DRILL(new DrillDef(2, 2, 3.2f, 4)), // 2x2, twice as fast and produces 4x.
                                                                               // Need to implement scaling based on how much resource it is on
 
     // --- FACTORIES ---
