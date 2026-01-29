@@ -20,8 +20,8 @@ public class Main extends ApplicationAdapter {
 
     // --- GAME SETTINGS ---
     private final int TILE_SIZE = 32;
-    private final int MAP_WIDTH = 250;
-    private final int MAP_HEIGHT = 250;
+    private final int MAP_WIDTH = 500;
+    private final int MAP_HEIGHT = 500;
 
     // --- DATA LAYER ---
     private Tile[][] map; // The actual data storage
@@ -32,6 +32,7 @@ public class Main extends ApplicationAdapter {
     private BuildingType selectedBuilding = BuildingType.BASIC_CONVEYOR;
 
     // --- VISUAL SETTINGS ---
+    private final Color CORE_COLOR = new Color(0.8f, 0.2f, 0.8f, 1f);
     private final Color HIGHLIGHT_COLOR = new Color(1f, 1f, 1f, 0.3f); // Semi-transparent white
     private final Color DRILL_COLOR = new Color(0.4f, 0.8f, 0.4f, 1f); // Green
     private final Color FACTORY_COLOR = new Color(0.9f, 0.6f, 0.2f, 1f); // Orange
@@ -58,6 +59,35 @@ public class Main extends ApplicationAdapter {
         // --- MAP GENERATION ---
         WorldGenerator generator = new WorldGenerator(MAP_WIDTH, MAP_HEIGHT);
         this.map = generator.generate();
+
+        int centerX = MAP_WIDTH / 2;
+        int centerY = MAP_HEIGHT / 2;
+
+        int clearRadius = 5;
+        for (int x = centerX - clearRadius; x <= centerX + clearRadius; x++) {
+            for (int y = centerY - clearRadius; y <= centerY + clearRadius; y++) {
+                if (x >= 0 && x < MAP_WIDTH && y >= 0 && y < MAP_HEIGHT) {
+                    map[x][y].terrain = TerrainType.DIRT; // Force flat land
+                    map[x][y].resource = null;            // Remove ores
+                    map[x][y].building = null;            // Remove trees/rocks if you had them
+                }
+            }
+        }
+
+        // Spawn core
+        Core core = new Core(centerX - 1, centerY - 1);
+        buildings.add(core);
+
+        for (int i = -1; i < core.width - 1; i++) {
+            for (int j = -1; j < core.height - 1; j++) {
+                if (centerX + i < MAP_WIDTH && centerY + j < MAP_HEIGHT) {
+                    map[centerX + i][centerY + j].building = core;
+
+                    map[centerX + i][centerY + j].terrain = TerrainType.DIRT;
+                    map[centerX + i][centerY + j].resource = null;
+                }
+            }
+        }
 
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override
@@ -124,7 +154,7 @@ public class Main extends ApplicationAdapter {
                 int h = selectedBuilding.def.height;
 
                 // Instantiate using the Helper
-                Building newBuilding = BuildingFactory.createBuilding(gridX, gridY, selectedBuilding);
+                Building newBuilding = selectedBuilding.create(gridX, gridY);
 
                 if (newBuilding != null) {
                     if (canPlaceBuilding(gridX, gridY, newBuilding)) {
@@ -246,7 +276,7 @@ public class Main extends ApplicationAdapter {
         if (hoveredTile != null && hoveredTile.building == null) {
 
             // Create temporary ghost building
-            Building temp = BuildingFactory.createBuilding(hoveredTile.x, hoveredTile.y, selectedBuilding);
+            Building temp = selectedBuilding.create(hoveredTile.x, hoveredTile.y);
 
             if (temp != null) {
                 // Apply rotation
@@ -329,6 +359,8 @@ public class Main extends ApplicationAdapter {
             shapeRenderer.setColor(Color.DARK_GRAY);
         } else if (b instanceof Factory) {
             shapeRenderer.setColor(FACTORY_COLOR);
+        } else if (b instanceof Core) {
+            shapeRenderer.setColor(CORE_COLOR);
         }
 
         // Draw the main box using width/height
