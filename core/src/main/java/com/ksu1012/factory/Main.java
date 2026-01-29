@@ -20,8 +20,8 @@ public class Main extends ApplicationAdapter {
 
     // --- GAME SETTINGS ---
     private final int TILE_SIZE = 32;
-    private final int MAP_WIDTH = 50;
-    private final int MAP_HEIGHT = 50;
+    private final int MAP_WIDTH = 250;
+    private final int MAP_HEIGHT = 250;
 
     // --- DATA LAYER ---
     private Tile[][] map; // The actual data storage
@@ -37,9 +37,9 @@ public class Main extends ApplicationAdapter {
     private final Color FACTORY_COLOR = new Color(0.9f, 0.6f, 0.2f, 1f); // Orange
 
     // --- PHYSICS SETTINGS ---
-    private final float ACCELERATION = 4000f;
-    private final float MAX_SPEED = 500f;
-    private final float FRICTION = 0.93f;
+    private final float ACCELERATION = 10000f;
+    private final float MAX_SPEED = 1000f;
+    private final float FRICTION = 0.96f;
 
     // --- PHYSICS STATE ---
     private Vector2 velocity = new Vector2(0, 0);
@@ -138,8 +138,6 @@ public class Main extends ApplicationAdapter {
                             }
                         }
 
-                        // --- CLEAN & POLYMORPHIC ---
-                        // Every building gets a chance to scan the map now.
                         newBuilding.onPlaced(map);
 
                     } else {
