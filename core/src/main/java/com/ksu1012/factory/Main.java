@@ -1,9 +1,6 @@
 package com.ksu1012.factory;
 
-import com.badlogic.gdx.ApplicationAdapter;
-import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
-import com.badlogic.gdx.InputAdapter;
+import com.badlogic.gdx.*;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
@@ -11,12 +8,24 @@ import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.ScreenUtils;
+import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.ui.Table;
+import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
+import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator.FreeTypeFontParameter;
+import com.badlogic.gdx.utils.viewport.ScreenViewport;
+import com.badlogic.gdx.scenes.scene2d.ui.Label.LabelStyle;
+import java.util.Map;
 
 import java.util.ArrayList;
 
 public class Main extends ApplicationAdapter {
     private OrthographicCamera camera;
-    private ShapeRenderer shapeRenderer;
+
+    // Replaced ShapeRenderer with SpriteBatch
+    private com.badlogic.gdx.graphics.g2d.SpriteBatch batch;
+    private com.badlogic.gdx.graphics.Texture whitePixel;
 
     // --- GAME SETTINGS ---
     private final int TILE_SIZE = 32;
@@ -37,6 +46,13 @@ public class Main extends ApplicationAdapter {
     private final Color DRILL_COLOR = new Color(0.4f, 0.8f, 0.4f, 1f); // Green
     private final Color FACTORY_COLOR = new Color(0.9f, 0.6f, 0.2f, 1f); // Orange
 
+    // --- UI ---
+    private float uiTimer = 0f;
+    private Stage uiStage;
+    private Label resourceLabel;
+    private Label selectionLabel;
+    private StringBuilder hudString = new StringBuilder();
+
     // --- PHYSICS SETTINGS ---
     private final float ACCELERATION = 10000f;
     private final float MAX_SPEED = 1000f;
@@ -54,22 +70,32 @@ public class Main extends ApplicationAdapter {
     public void create() {
         camera = new OrthographicCamera();
         camera.position.set(MAP_WIDTH * TILE_SIZE / 2f, MAP_HEIGHT * TILE_SIZE / 2f, 0);
-        shapeRenderer = new ShapeRenderer();
+
+        // New Rendering system
+        batch = new com.badlogic.gdx.graphics.g2d.SpriteBatch();
+
+        // 1x1 white pixel
+        com.badlogic.gdx.graphics.Pixmap pixmap = new com.badlogic.gdx.graphics.Pixmap(1, 1, com.badlogic.gdx.graphics.Pixmap.Format.RGBA8888);
+        pixmap.setColor(Color.WHITE);
+        pixmap.fill();
+        whitePixel = new com.badlogic.gdx.graphics.Texture(pixmap);
+        pixmap.dispose();
 
         // --- MAP GENERATION ---
-        WorldGenerator generator = new WorldGenerator(MAP_WIDTH, MAP_HEIGHT);
-        this.map = generator.generate();
+        WorldGenerator worldGenerator = new WorldGenerator(MAP_WIDTH, MAP_HEIGHT);
+        this.map = worldGenerator.generate();
 
         int centerX = MAP_WIDTH / 2;
         int centerY = MAP_HEIGHT / 2;
 
+        // Clear an area in the center of the map (where the core will be)
         int clearRadius = 5;
         for (int x = centerX - clearRadius; x <= centerX + clearRadius; x++) {
             for (int y = centerY - clearRadius; y <= centerY + clearRadius; y++) {
                 if (x >= 0 && x < MAP_WIDTH && y >= 0 && y < MAP_HEIGHT) {
-                    map[x][y].terrain = TerrainType.DIRT; // Force flat land
-                    map[x][y].resource = null;            // Remove ores
-                    map[x][y].building = null;            // Remove trees/rocks if you had them
+                    map[x][y].terrain = TerrainType.DIRT;
+                    map[x][y].resource = null;
+                    map[x][y].building = null;
                 }
             }
         }
@@ -89,7 +115,38 @@ public class Main extends ApplicationAdapter {
             }
         }
 
-        Gdx.input.setInputProcessor(new InputAdapter() {
+        // --- UI SETUP ---
+        uiStage = new Stage(new ScreenViewport());
+
+        BitmapFont font = new BitmapFont();
+        font.getData().setScale(2.0f);
+
+        LabelStyle style = new LabelStyle();
+        style.font = font;
+        style.fontColor = Color.WHITE;
+
+        // Table
+        Table rootTable = new Table();
+        rootTable.setFillParent(true);
+        rootTable.top().left();
+
+        // Create Labels
+        resourceLabel = new Label("Resources: 0", style);
+        selectionLabel = new Label("Selected: Conveyor", style);
+
+        // Add to Table
+        rootTable.add(resourceLabel).pad(10).left();
+        rootTable.row(); // New line
+        rootTable.add(selectionLabel).pad(10).left();
+        rootTable.row().expandY(); // Push everything else down
+
+        uiStage.addActor(rootTable);
+
+        InputMultiplexer multiplexer = new InputMultiplexer();
+
+        multiplexer.addProcessor(uiStage);
+
+        multiplexer.addProcessor(new InputAdapter() {
             @Override
             public boolean scrolled(float amountX, float amountY) {
                 float zoomSpeed = 0.1f;
@@ -98,6 +155,8 @@ public class Main extends ApplicationAdapter {
                 return true;
             }
         });
+
+        Gdx.input.setInputProcessor(multiplexer);
     }
 
     @Override
@@ -105,17 +164,28 @@ public class Main extends ApplicationAdapter {
         camera.viewportWidth = width;
         camera.viewportHeight = height;
         camera.update();
+
+        // Update UI Viewport
+        uiStage.getViewport().update(width, height, true);
     }
 
     @Override
     public void render() {
-        float deltaTime = Gdx.graphics.getDeltaTime();
+        float deltaTime = Math.min(Gdx.graphics.getDeltaTime(), 0.1f); // Only do up to 0.1s of simulation per frame
 
         // Update logic
         update(deltaTime);
 
         // Draw visuals
         draw();
+
+        // Draw UI
+        uiTimer += deltaTime;
+        if (uiTimer >= 0.1f) {
+            updateUI();
+            uiTimer = 0f;
+        }
+        uiStage.draw();
     }
 
     // Handles all game logic, physics, and input.
@@ -227,15 +297,50 @@ public class Main extends ApplicationAdapter {
         camera.update();
     }
 
+    private void updateUI() {
+        // --- 1. UPDATE RESOURCES ---
+        hudString.setLength(0); // Clear the buffer
+        hudString.append("[RESOURCES]\n");
+
+        if (GameState.instance != null) {
+            for (Map.Entry<ItemType, Integer> entry : GameState.instance.resources.entrySet()) {
+                // Only show items we have discovered? Or all?
+                // Let's show all since we initialized them to 0.
+                String name = formatEnumName(entry.getKey().name());
+                hudString.append(name)
+                    .append(": ")
+                    .append(entry.getValue())
+                    .append("\n");
+            }
+        }
+        resourceLabel.setText(hudString);
+
+        // --- 2. UPDATE SELECTION ---
+        String buildingName = formatEnumName(selectedBuilding.name());
+        selectionLabel.setText("SELECTED: " + buildingName + "\nROTATION: " + currentFacing);
+
+        // This tells the UI to recalculate layout if the text length changed
+        uiStage.act();
+    }
+
+    // Helper to turn "COPPER_ORE" into "Copper Ore"
+    private String formatEnumName(String name) {
+        String[] words = name.toLowerCase().split("_");
+        StringBuilder sb = new StringBuilder();
+        for (String word : words) {
+            sb.append(Character.toUpperCase(word.charAt(0)))
+                .append(word.substring(1))
+                .append(" ");
+        }
+        return sb.toString().trim();
+    }
+
     // Handles rendering
     private void draw() {
         ScreenUtils.clear(0.1f, 0.1f, 0.1f, 1);
 
-        Gdx.gl.glEnable(Gdx.gl.GL_BLEND);
-        Gdx.gl.glBlendFunc(Gdx.gl.GL_SRC_ALPHA, Gdx.gl.GL_ONE_MINUS_SRC_ALPHA);
-
-        shapeRenderer.setProjectionMatrix(camera.combined);
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        batch.setProjectionMatrix(camera.combined);
+        batch.begin(); // Start GPU Batch
 
         // Calculate Visible Range
         float viewWidth = camera.viewportWidth * camera.zoom;
@@ -289,19 +394,19 @@ public class Main extends ApplicationAdapter {
 
                 // Choose color based on validity (red if invalid, white if not)
                 if (isValid) {
-                    shapeRenderer.setColor(1f, 1f, 1f, 0.5f);
+                    batch.setColor(1f, 1f, 1f, 0.5f);
                 } else {
-                    shapeRenderer.setColor(1f, 0f, 0f, 0.5f);
+                    batch.setColor(1f, 0f, 0f, 0.5f);
                 }
 
                 int gx = hoveredTile.x * TILE_SIZE;
                 int gy = hoveredTile.y * TILE_SIZE;
 
                 // Draw over placement area
-                shapeRenderer.rect(gx, gy, temp.width * TILE_SIZE, temp.height * TILE_SIZE);
+                batch.draw(whitePixel, gx, gy, temp.width * TILE_SIZE, temp.height * TILE_SIZE);
 
                 // Draw direction indicator
-                shapeRenderer.setColor(1f, 1f, 0f, 0.5f);
+                batch.setColor(1f, 1f, 0f, 0.5f);
 
                 // Calculate center based on building size
                 float centerX = gx + (temp.width * TILE_SIZE) / 2f;
@@ -311,18 +416,17 @@ public class Main extends ApplicationAdapter {
                 float dotX = centerX + (currentFacing.dx * temp.width * TILE_SIZE / 2f) - 3;
                 float dotY = centerY + (currentFacing.dy * temp.height * TILE_SIZE / 2f) - 3;
 
-                shapeRenderer.rect(dotX, dotY, 6, 6);
+                batch.draw(whitePixel, dotX, dotY, 6, 6);
             }
         }
 
         // Highlight tile
         if (hoveredTile != null) {
-            shapeRenderer.setColor(HIGHLIGHT_COLOR);
-            shapeRenderer.rect(hoveredTile.x * TILE_SIZE, hoveredTile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            batch.setColor(HIGHLIGHT_COLOR);
+            batch.draw(whitePixel, hoveredTile.x * TILE_SIZE, hoveredTile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         }
 
-        shapeRenderer.end();
-        Gdx.gl.glDisable(Gdx.gl.GL_BLEND);
+        batch.end();
     }
 
     private void drawGround(int x, int y) {
@@ -330,63 +434,57 @@ public class Main extends ApplicationAdapter {
 
         // Base Terrain layer
         if ((x + y) % 2 == 0) { // Checkerboard
-            shapeRenderer.setColor(tile.terrain.color1);
+            batch.setColor(tile.terrain.color1);
         } else {
-            shapeRenderer.setColor(tile.terrain.color2);
+            batch.setColor(tile.terrain.color2);
         }
 
-        shapeRenderer.rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        batch.draw(whitePixel, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
 
         // Resource Layer
         if (tile.resource != null) {
-            shapeRenderer.setColor(tile.resource.color);
-
+            batch.setColor(tile.resource.color);
             float margin = 4;
-            shapeRenderer.rect(
-                (x * TILE_SIZE) + margin,
-                (y * TILE_SIZE) + margin,
-                TILE_SIZE - (margin * 2),
-                TILE_SIZE - (margin * 2)
-            );
+            batch.draw(whitePixel, (x * TILE_SIZE) + margin, (y * TILE_SIZE) + margin, TILE_SIZE - (margin * 2), TILE_SIZE - (margin * 2));
         }
     }
 
     private void drawBuilding(Building b) {
         // --- DRAW BUILDING ---
         if (b instanceof Drill) {
-            shapeRenderer.setColor(DRILL_COLOR);
+            batch.setColor(DRILL_COLOR);
         } else if (b instanceof Conveyor) {
-            shapeRenderer.setColor(Color.DARK_GRAY);
+            batch.setColor(Color.DARK_GRAY);
         } else if (b instanceof Factory) {
-            shapeRenderer.setColor(FACTORY_COLOR);
+            batch.setColor(FACTORY_COLOR);
         } else if (b instanceof Core) {
-            shapeRenderer.setColor(CORE_COLOR);
+            batch.setColor(CORE_COLOR);
         }
 
         // Draw the main box using width/height
-        shapeRenderer.rect(
+        batch.draw(whitePixel,
             (b.x * TILE_SIZE) + 2,
             (b.y * TILE_SIZE) + 2,
             (b.width * TILE_SIZE) - 4,
-            (b.height * TILE_SIZE) - 4
-        );
+            (b.height * TILE_SIZE) - 4);
+
 
         // --- DRAW DIRECTION INDICATOR (Yellow Dot) ---
-        shapeRenderer.setColor(Color.YELLOW);
+        batch.setColor(Color.YELLOW);
         float centerX = (b.x * TILE_SIZE) + (b.width * TILE_SIZE) / 2f;
         float centerY = (b.y * TILE_SIZE) + (b.height * TILE_SIZE) / 2f;
 
         // Offset the dot based on facing direction (dx/dy)
         float dotX = centerX + (b.facing.dx * 10) - 3;
         float dotY = centerY + (b.facing.dy * 10) - 3;
-        shapeRenderer.rect(dotX, dotY, 6, 6);
+        batch.draw(whitePixel, dotX, dotY, 6, 6);
 
         // --- DRAW ITEMS ---
         ItemType item = b.getFirstItem();
         if (item != null) {
-            shapeRenderer.setColor(item.color);
+            batch.setColor(item.color);
             // Draw item slightly smaller in center
-            shapeRenderer.rect(centerX - 4, centerY - 4, 8, 8);
+            batch.draw(whitePixel, centerX - 4, centerY - 4, 8, 8);
         }
     }
 
@@ -418,6 +516,7 @@ public class Main extends ApplicationAdapter {
 
     @Override
     public void dispose() {
-        shapeRenderer.dispose();
-    }
+        batch.dispose();
+        whitePixel.dispose();
+        if(uiStage != null) uiStage.dispose();    }
 }

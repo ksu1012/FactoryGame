@@ -9,10 +9,13 @@ public class GameState {
     public HashMap<ItemType, Integer> resources = new HashMap<>();
 
     public GameState() {
+        for (ItemType type : ItemType.values()) {
+            resources.put(type, 0);
+        }
     }
 
     public void addResource(ItemType type, int amount) {
         resources.put(type, resources.getOrDefault(type, 0) + amount);
-        System.out.println("Inventory: " + type + " = " + resources.get(type));
+        System.out.println("Inventory: " + type + " = " + resources.get(type)); // Temporary print statement
     }
 }
