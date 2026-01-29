@@ -21,9 +21,8 @@ public class WorldGenerator {
 
     public Tile[][] generate() {
         Tile[][] map = new Tile[width][height];
-        int totalMapArea = width * height;
 
-        // Initialize
+        // Initialize map
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
                 map[x][y] = new Tile(x, y);
@@ -55,7 +54,7 @@ public class WorldGenerator {
     private void generateResources(Tile[][] map) {
         int totalMapArea = width * height;
 
-        // Loop through EVERY resource defined in the Enum
+        // Loop all resources
         for (ResourceType type : ResourceType.values()) {
             // Calculate how many patches to spawn based on map size
             int totalCount = (int) (totalMapArea * type.density);
@@ -116,13 +115,13 @@ public class WorldGenerator {
                 thickness += MathUtils.random(-0.3f, 0.3f);
                 thickness = MathUtils.clamp(thickness, 1.0f, 2.0f);
 
-                // Draw brush with NOISY edges
+                // Create rough edges
                 drawNoisyBrush(map, (int)x, (int)y, thickness, type);
 
                 x += dir.x;
                 y += dir.y;
 
-                // Wiggle direction (snake movement)
+                // Wiggle direction
                 dir.rotateDeg(MathUtils.random(-15f, 15f));
 
                 if (x < 3 || x >= width - 3 || y < 3 || y >= height - 3) break;
@@ -169,9 +168,7 @@ public class WorldGenerator {
         }
     }
 
-    /**
-     * Helper: Draws a circle but randomly skips edges to look ragged.
-     */
+    // Draws a circle with rough edges
     private void drawNoisyBrush(Tile[][] map, int centerX, int centerY, float radius, ResourceType type) {
         int r = (int) Math.ceil(radius);
 
@@ -180,11 +177,6 @@ public class WorldGenerator {
                 if (x >= 0 && x < width && y >= 0 && y < height) {
 
                     float dist = Vector2.dst(centerX, centerY, x, y);
-
-                    // The Magic:
-                    // If dist < radius - 0.5, solid core.
-                    // If dist is at the edge, 50% chance to skip.
-                    // If dist is outside, skip.
 
                     boolean shouldPaint = false;
 
