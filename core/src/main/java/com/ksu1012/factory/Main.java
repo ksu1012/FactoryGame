@@ -17,6 +17,13 @@ import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator.FreeTypeFont
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.badlogic.gdx.scenes.scene2d.ui.Label.LabelStyle;
 import java.util.Map;
+import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
+import com.badlogic.gdx.scenes.scene2d.InputEvent;
+import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
+import com.badlogic.gdx.scenes.scene2d.ui.TextButton.TextButtonStyle;
+import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 
 import java.util.ArrayList;
 
@@ -129,10 +136,58 @@ public class Main extends ApplicationAdapter {
         style.font = font;
         style.fontColor = Color.WHITE;
 
+        // Gray background for buttons
+        Pixmap bgPixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+        bgPixmap.setColor(new Color(0.2f, 0.2f, 0.2f, 0.8f)); // Dark Grey, slightly transparent
+        bgPixmap.fill();
+        TextureRegionDrawable buttonBg = new TextureRegionDrawable(new Texture(bgPixmap));
+
+        // Lighter gray for selected option
+        bgPixmap.setColor(new Color(0.4f, 0.4f, 0.4f, 0.8f));
+        bgPixmap.fill();
+        TextureRegionDrawable buttonDown = new TextureRegionDrawable(new Texture(bgPixmap));
+
+        TextButtonStyle buttonStyle = new TextButtonStyle();
+        buttonStyle.up = buttonBg;
+        buttonStyle.down = buttonDown;
+        buttonStyle.checked = buttonDown; // Selected
+        buttonStyle.font = font;
+        buttonStyle.fontColor = Color.WHITE;
+
+        // Create the Toolbar Table
+        Table toolbarTable = new Table();
+        toolbarTable.bottom(); // Align to bottom of screen
+        toolbarTable.setFillParent(true);
+
+        // Add Buttons from the BuildingType enum, skipping core (maybe allow this in future)
+        for (BuildingType type : BuildingType.values()) {
+            if (type == BuildingType.CORE) continue;
+
+            // Create Button
+            String name = type.name().substring(0, 1) + type.name().substring(1).toLowerCase();
+            TextButton button = new TextButton(name, buttonStyle);
+
+            // Add listener
+            button.addListener(new ClickListener() {
+                @Override
+                public void clicked(InputEvent event, float x, float y) {
+                    selectedBuilding = type;
+                    // Update visuals
+                }
+            });
+
+            toolbarTable.add(button).pad(5).width(120).height(40);
+        }
+
+        // Add Toolbar to Stage
+        uiStage.addActor(toolbarTable);
+
         // Table
         Table rootTable = new Table();
         rootTable.setFillParent(true);
         rootTable.top().left();
+        rootTable.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.childrenOnly);
+
 
         // Create Labels
         resourceLabel = new Label("Resources: 0", style);
@@ -223,6 +278,13 @@ public class Main extends ApplicationAdapter {
 
         // --- PLACEMENT ---
         if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
+            Vector2 stagePos = uiStage.screenToStageCoordinates(new Vector2(Gdx.input.getX(), Gdx.input.getY()));
+
+            // Ignore Button clicks
+            if (uiStage.hit(stagePos.x, stagePos.y, true) != null) {
+                return;
+            }
+
             if (hoveredTile != null) {
                 Building newBuilding = selectedBuilding.create(gridX, gridY);
 
