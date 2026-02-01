@@ -68,6 +68,10 @@ public class Main extends ApplicationAdapter {
 
     @Override
     public void create() {
+        // TEMP: START WITH RESOURCES
+        GameState.instance.addResource(ItemType.COPPER, 100);
+        GameState.instance.addResource(ItemType.IRON, 100);
+
         camera = new OrthographicCamera();
         camera.position.set(MAP_WIDTH * TILE_SIZE / 2f, MAP_HEIGHT * TILE_SIZE / 2f, 0);
 
@@ -220,18 +224,21 @@ public class Main extends ApplicationAdapter {
         // --- PLACEMENT ---
         if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
             if (hoveredTile != null) {
-                int w = selectedBuilding.def.width;
-                int h = selectedBuilding.def.height;
-
-                // Instantiate using the Helper
                 Building newBuilding = selectedBuilding.create(gridX, gridY);
 
                 if (newBuilding != null) {
-                    if (canPlaceBuilding(gridX, gridY, newBuilding)) {
+                    // Check location validity
+                    boolean isSpaceValid = canPlaceBuilding(gridX, gridY, newBuilding);
+
+                    // Check if the building can be afforded
+                    boolean canAfford = GameState.instance.canAfford(selectedBuilding.def.cost);
+
+                    if (isSpaceValid && canAfford) {
+                        GameState.instance.payCost(selectedBuilding.def.cost);
+
                         newBuilding.facing = currentFacing;
                         buildings.add(newBuilding);
 
-                        // Fill Footprint
                         for (int i = 0; i < newBuilding.width; i++) {
                             for (int j = 0; j < newBuilding.height; j++) {
                                 map[gridX + i][gridY + j].building = newBuilding;
@@ -239,9 +246,7 @@ public class Main extends ApplicationAdapter {
                         }
 
                         newBuilding.onPlaced(map);
-
-                    } else {
-                        System.out.println("Cannot build here");
+                        System.out.println("Placed " + selectedBuilding.name());
                     }
                 }
             }
@@ -298,14 +303,13 @@ public class Main extends ApplicationAdapter {
     }
 
     private void updateUI() {
-        // --- 1. UPDATE RESOURCES ---
+        // Update Resources
         hudString.setLength(0); // Clear the buffer
         hudString.append("[RESOURCES]\n");
 
         if (GameState.instance != null) {
             for (Map.Entry<ItemType, Integer> entry : GameState.instance.resources.entrySet()) {
-                // Only show items we have discovered? Or all?
-                // Let's show all since we initialized them to 0.
+                // Currently showing all resources (even if 0)
                 String name = formatEnumName(entry.getKey().name());
                 hudString.append(name)
                     .append(": ")
@@ -315,11 +319,27 @@ public class Main extends ApplicationAdapter {
         }
         resourceLabel.setText(hudString);
 
-        // --- 2. UPDATE SELECTION ---
+        // Update Selection
         String buildingName = formatEnumName(selectedBuilding.name());
         selectionLabel.setText("SELECTED: " + buildingName + "\nROTATION: " + currentFacing);
+        hudString.setLength(0);
+        hudString.append("SELECTED: ").append(formatEnumName(selectedBuilding.name())).append("\n");
+        hudString.append("ROTATION: ").append(currentFacing).append("\n");
+        hudString.append("COST:\n");
 
-        // This tells the UI to recalculate layout if the text length changed
+        if (selectedBuilding.def.cost.isEmpty()) {
+            hudString.append(" Free");
+        } else {
+            for (Map.Entry<ItemType, Integer> entry : selectedBuilding.def.cost.entrySet()) {
+                hudString.append(" - ")
+                    .append(formatEnumName(entry.getKey().name()))
+                    .append(": ")
+                    .append(entry.getValue())
+                    .append("\n");
+            }
+        }
+        selectionLabel.setText(hudString);
+
         uiStage.act();
     }
 
@@ -387,16 +407,17 @@ public class Main extends ApplicationAdapter {
                 // Apply rotation
                 temp.facing = currentFacing;
 
-                // Check placement validity
-                boolean isValid = canPlaceBuilding(hoveredTile.x, hoveredTile.y, temp);
+                // Check both conditions
+                boolean isSpaceValid = canPlaceBuilding(hoveredTile.x, hoveredTile.y, temp);
+                boolean canAfford = GameState.instance.canAfford(selectedBuilding.def.cost);
 
                 Gdx.gl.glEnable(Gdx.gl.GL_BLEND);
 
-                // Choose color based on validity (red if invalid, white if not)
-                if (isValid) {
-                    batch.setColor(1f, 1f, 1f, 0.5f);
+                // Valid only if both conditions are met
+                if (isSpaceValid && canAfford) {
+                    batch.setColor(1f, 1f, 1f, 0.5f); // White
                 } else {
-                    batch.setColor(1f, 0f, 0f, 0.5f);
+                    batch.setColor(1f, 0f, 0f, 0.5f); // Red
                 }
 
                 int gx = hoveredTile.x * TILE_SIZE;
