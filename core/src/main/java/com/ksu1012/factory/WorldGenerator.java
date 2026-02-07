@@ -6,6 +6,17 @@ import com.badlogic.gdx.math.Vector2;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Handles the procedural generation of the game map.
+ * <p>
+ * Utilizes a multi-pass algorithm:
+ * <ol>
+ *   <li><b>Fractal Noise:</b> Generates base terrain and biomes (Walls, Water, Dirt).</li>
+ *   <li><b>Cellular Automata:</b> Applies smoothing passes to remove noise artifacts.</li>
+ *   <li><b>Walker Algorithms:</b> Generates organic resource veins rather than uniform clusters.</li>
+ * </ol>
+ */
+
 public class WorldGenerator {
 
     private int width;

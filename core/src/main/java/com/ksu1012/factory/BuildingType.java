@@ -4,6 +4,14 @@ interface BuildingBuilder {
     Building build(int x, int y, BuildingDef def);
 }
 
+/**
+ * A Data-Driven definition of all game entities.
+ * <p>
+ * Utilizes the <b>Factory Pattern</b> via Functional Interfaces to dynamically
+ * instantiate specific building classes without requiring hardcoded switch statements
+ * in the game loop.
+ */
+
 public enum BuildingType {
     // --- CONVEYORS ---
     BASIC_CONVEYOR(new ConveyorDef(0.5f)

@@ -3,6 +3,17 @@ package com.ksu1012.factory;
 import java.util.HashMap;
 import java.util.HashSet;
 
+/**
+ * Abstract base class representing any placeable entity in the game world.
+ * <p>
+ * This class handles core building logic, including:
+ * <ul>
+ *   <li>Multi-tile footprints (Width/Height)</li>
+ *   <li>Inventory management with slot-specific capacity limits</li>
+ *   <li>Directional item transport logic ({@code tryPushItem})</li>
+ * </ul>
+ */
+
 public abstract class Building {
     public int x, y;
     public int width = 1;
@@ -45,7 +56,13 @@ public abstract class Building {
         return tryPushItem(grid, getFirstItem());
     }
 
-    // Move a specific item from this Building to the one in front. Returns true if successful
+    /**
+     * Iterates through the output edge of the building based on its dimensions and orientation.
+     * Attempts to push items into valid neighboring inventories.
+     *
+     * @param grid The game map for neighbor lookups.
+     * @return true if an item was successfully transferred.
+     */
     protected boolean tryPushItem(Tile[][] grid, ItemType itemToMove) {
         if (itemToMove == null || inventory.getOrDefault(itemToMove, 0) <= 0) return false;
 
