@@ -146,6 +146,21 @@ public abstract class Building {
         return true;
     }
 
+    public void setFacing(Direction newFacing) {
+        // Check if we are changing orientation (Vertical <-> Horizontal)
+        boolean isCurrentlyVertical = (this.facing == Direction.NORTH || this.facing == Direction.SOUTH);
+        boolean isToBeVertical = (newFacing == Direction.NORTH || newFacing == Direction.SOUTH);
+
+        if (isCurrentlyVertical != isToBeVertical) {
+            // Swap dimensions
+            int temp = this.width;
+            this.width = this.height;
+            this.height = temp;
+        }
+
+        this.facing = newFacing;
+    }
+
     // --- HELPERS ---
 
     public int getItemCount(ItemType type) {

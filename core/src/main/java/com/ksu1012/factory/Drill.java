@@ -54,15 +54,12 @@ public class Drill extends Building {
         if (timer >= miningSpeed) {
             timer -= miningSpeed;
 
-            Tile myTile = grid[x][y];
-            mineResource(myTile);
+            mineResource();
         }
         tryPushItem(grid);
     }
 
-    private void mineResource(Tile tile) {
-        if (tile.resource != null) {
-            addInternalItem(tile.resource.minedItem, quantity);
-        }
+    private void mineResource() {
+        addInternalItem(this.resource, quantity);
     }
 }

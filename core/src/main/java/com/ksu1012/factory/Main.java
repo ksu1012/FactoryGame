@@ -297,6 +297,9 @@ public class Main extends ApplicationAdapter {
                 Building newBuilding = selectedBuilding.create(gridX, gridY);
 
                 if (newBuilding != null) {
+                    // Set orientation
+                    newBuilding.setFacing(currentFacing);
+
                     // Check location validity
                     boolean isSpaceValid = canPlaceBuilding(gridX, gridY, newBuilding);
 
@@ -474,8 +477,8 @@ public class Main extends ApplicationAdapter {
             Building temp = selectedBuilding.create(hoveredTile.x, hoveredTile.y);
 
             if (temp != null) {
-                // Apply rotation
-                temp.facing = currentFacing;
+                // Set orientation
+                temp.setFacing(currentFacing);
 
                 // Check both conditions
                 boolean isSpaceValid = canPlaceBuilding(hoveredTile.x, hoveredTile.y, temp);
