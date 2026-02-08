@@ -28,7 +28,7 @@ public enum BuildingType {
         .addCost(ItemType.COPPER, 5),
         (x, y, def) -> new Drill(x, y, (DrillDef) def)),
 
-    LARGE_DRILL(new DrillDef(2, 3, 3.2f, 4)
+    LARGE_DRILL(new DrillDef(2, 2, 3.2f, 4)
         .addCost(ItemType.COPPER, 10)
         .addCost(ItemType.IRON, 5),
         (x, y, def) -> new Drill(x, y, (DrillDef) def)),
