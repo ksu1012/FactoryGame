@@ -4,14 +4,12 @@ import java.util.Map;
 
 public class Factory extends Building {
 
-    private FactoryDef definition;
+    FactoryDef definition;
     private Recipe activeRecipe = null; // The recipe in progress
     private float progressTimer = 0f;
 
     public Factory(int x, int y, FactoryDef def) {
-        super(x, y);
-        this.width = def.width;
-        this.height = def.height;
+        super(x, y, def);
         this.definition = def;
 
         setAcceptsAnyItem(false);
@@ -36,6 +34,11 @@ public class Factory extends Building {
 
     @Override
     public void update(float delta, Tile[][] grid) {
+        // Check Power
+        if (definition.powerConsumption > 0 && !hasPower) {
+            return;
+        }
+
         // Find Recipe
         if (activeRecipe == null) {
             findMatchingRecipe();

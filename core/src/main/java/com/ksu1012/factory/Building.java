@@ -20,6 +20,8 @@ public abstract class Building {
     public int height = 1;
     public Direction facing = Direction.NORTH;
 
+    protected BuildingDef definition;
+
     protected HashMap<ItemType, Integer> inventory = new HashMap<>();
 
     // Collective item capacity (primarily for conveyors). -1 if no limit
@@ -36,9 +38,16 @@ public abstract class Building {
     // Types of terrain the Building can be placed on
     protected HashSet<TerrainType> validTerrain = new HashSet<>();
 
-    public Building(int x, int y) {
+    public PowerNetwork network = null;
+    public Boolean hasPower = false;
+
+    public Building(int x, int y, BuildingDef def) {
         this.x = x;
         this.y = y;
+        this.definition = def;
+
+        this.width = def.width;
+        this.height = def.height;
 
         // Allow building on dirt by default
         validTerrain.add(TerrainType.DIRT);
@@ -188,5 +197,13 @@ public abstract class Building {
 
     public void onPlaced(Tile[][] grid) {
         // Override in subclasses
+    }
+
+    public float getConnectionRadius() {
+        return 1.5f; // Default to requiring contact
+    }
+
+    public BuildingDef getDefinition() {
+        return definition;
     }
 }

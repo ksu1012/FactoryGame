@@ -2,10 +2,8 @@ package com.ksu1012.factory;
 
 public class Core extends Building {
 
-    public Core(int x, int y) {
-        super(x, y);
-        this.width = 3;
-        this.height = 3;
+    public Core(int x, int y, CoreDef def) {
+        super(x, y, def);
 
         // Accepts everything
         setAcceptsAnyItem(true);

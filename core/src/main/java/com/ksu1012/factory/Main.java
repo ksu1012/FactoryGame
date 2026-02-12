@@ -50,6 +50,7 @@ public class Main extends ApplicationAdapter {
     // --- DATA LAYER ---
     private Tile[][] map; // The actual data storage
     private ArrayList<Building> buildings = new ArrayList<>(); // Optimization list
+    private PowerSystem powerSystem = new PowerSystem();
 
     // Selection state
     private Direction currentFacing = Direction.NORTH;
@@ -60,6 +61,8 @@ public class Main extends ApplicationAdapter {
     private final Color HIGHLIGHT_COLOR = new Color(1f, 1f, 1f, 0.3f); // Semi-transparent white
     private final Color DRILL_COLOR = new Color(0.4f, 0.8f, 0.4f, 1f); // Green
     private final Color FACTORY_COLOR = new Color(0.9f, 0.6f, 0.2f, 1f); // Orange
+    private final Color POWER_LINE_COLOR = new Color(1.0f, 0.9f, 0.4f, 0.6f);
+    private final Color POWER_POLE_COLOR = new Color(0.7f, 0.7f, 0.5f, 1f);
 
     // --- UI ---
     private float uiTimer = 0f;
@@ -120,7 +123,7 @@ public class Main extends ApplicationAdapter {
         }
 
         // Spawn core
-        Core core = new Core(centerX - 1, centerY - 1);
+        Core core = new Core(centerX - 1, centerY - 1, new CoreDef(3, 3));
         buildings.add(core);
 
         for (int i = -1; i < core.width - 1; i++) {
@@ -311,6 +314,7 @@ public class Main extends ApplicationAdapter {
 
                         newBuilding.facing = currentFacing;
                         buildings.add(newBuilding);
+                        powerSystem.rebuildNetworks(buildings);
 
                         for (int i = 0; i < newBuilding.width; i++) {
                             for (int j = 0; j < newBuilding.height; j++) {
@@ -330,6 +334,7 @@ public class Main extends ApplicationAdapter {
             if (hoveredTile != null && hoveredTile.building != null) {
                 Building b = hoveredTile.building;
                 buildings.remove(b);
+                powerSystem.rebuildNetworks(buildings);
 
                 // Clear the whole footprint
                 for (int i = 0; i < b.width; i++) {
@@ -346,6 +351,8 @@ public class Main extends ApplicationAdapter {
         for (Building b : buildings) {
             b.update(delta, map);
         }
+
+        powerSystem.update();
     }
 
     // Check against bounds, occupancy, and Building's own terrain rules
@@ -520,7 +527,56 @@ public class Main extends ApplicationAdapter {
             batch.draw(whitePixel, hoveredTile.x * TILE_SIZE, hoveredTile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         }
 
+        // --- DRAW POWER LINES ---
+        // Iterate through all active power networks
+        if (powerSystem != null) {
+            for (PowerNetwork net : powerSystem.getNetworks()) {
+
+                // Compare every building in the network to every other building
+                // (i + 1 optimization prevents drawing the same line twice)
+                for (int i = 0; i < net.members.size(); i++) {
+                    Building a = net.members.get(i);
+
+                    for (int j = i + 1; j < net.members.size(); j++) {
+                        Building b = net.members.get(j);
+
+                        // Check if they are close enough to physically connect
+                        float range = Math.max(a.getConnectionRadius(), b.getConnectionRadius());
+                        float dst = Vector2.dst(a.x, a.y, b.x, b.y);
+
+                        // If they are within range (and not the same building)
+                        if (dst <= range) {
+                            // Calculate centers (in pixels)
+                            float x1 = (a.x * TILE_SIZE) + (a.width * TILE_SIZE) / 2f;
+                            float y1 = (a.y * TILE_SIZE) + (a.height * TILE_SIZE) / 2f;
+                            float x2 = (b.x * TILE_SIZE) + (b.width * TILE_SIZE) / 2f;
+                            float y2 = (b.y * TILE_SIZE) + (b.height * TILE_SIZE) / 2f;
+
+                            // Draw the beam
+                            drawLine(x1, y1, x2, y2, 2f, POWER_LINE_COLOR); // 2f thickness
+                        }
+                    }
+                }
+            }
+        }
+
         batch.end();
+    }
+
+    private void drawLine(float x1, float y1, float x2, float y2, float thickness, Color color) {
+        float dx = x2 - x1;
+        float dy = y2 - y1;
+        float dist = (float)Math.sqrt(dx*dx + dy*dy);
+        float angle = MathUtils.atan2(dy, dx) * MathUtils.radDeg;
+
+        batch.setColor(color);
+        // We draw the whitePixel:
+        // - At x1, y1
+        // - With Origin at 0, thickness/2 (so the line is centered on the start point)
+        // - Width = dist (length of line)
+        // - Height = thickness
+        // - Rotated by 'angle'
+        batch.draw(whitePixel, x1, y1, 0, thickness/2, dist, thickness, 1, 1, angle, 0, 0, 1, 1, false, false);
     }
 
     private void drawGround(int x, int y) {
@@ -553,6 +609,10 @@ public class Main extends ApplicationAdapter {
             batch.setColor(FACTORY_COLOR);
         } else if (b instanceof Core) {
             batch.setColor(CORE_COLOR);
+        } else if (b instanceof PowerPole) {
+            batch.setColor(POWER_POLE_COLOR);
+        } else {
+            batch.setColor(Color.WHITE);
         }
 
         // Draw the main box using width/height

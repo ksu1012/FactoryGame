@@ -8,9 +8,7 @@ public class Drill extends Building {
     private ItemType resource;
 
     public Drill(int x, int y, DrillDef def) {
-        super(x, y);
-        this.width = def.width;
-        this.height = def.height;
+        super(x, y, def);
         this.miningSpeed = def.miningSpeed;
         this.quantity = def.quantity;
 

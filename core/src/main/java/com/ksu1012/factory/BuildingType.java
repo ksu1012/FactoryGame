@@ -47,9 +47,21 @@ public enum BuildingType {
         .addCost(ItemType.IRON, 15),
         (x, y, def) -> new Factory(x, y, (FactoryDef) def)),
 
+    // --- GENERATORS ---
+    COAL_GENERATOR(new FactoryDef(2, 2, 1.0f, 20, Recipes.BURN_COAL) // We need a Burn Recipe!
+        .addCost(ItemType.COPPER, 10)
+        .addCost(ItemType.IRON, 5)
+        .setPowerGeneration(100f),
+        (x, y, def) -> new Factory(x, y, (FactoryDef)def)),
+
+    // --- POWER POLES ---
+    POWER_POLE(new PowerPoleDef(1, 1)
+        .addCost(ItemType.COPPER, 1),
+        (x, y, def) -> new PowerPole(x, y, def)),
+
     // --- CORE ---
     CORE(new CoreDef(3, 3),
-        (x, y, def) -> new Core(x, y));
+        (x, y, def) -> new Core(x, y, (CoreDef) def));
 
 
     public final BuildingDef def;

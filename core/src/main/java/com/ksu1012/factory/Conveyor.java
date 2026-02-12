@@ -6,9 +6,7 @@ public class Conveyor extends Building {
 
     // Constructor takes the Definition now!
     public Conveyor(int x, int y, ConveyorDef def) {
-        super(x, y);
-        this.width = def.width;
-        this.height = def.height;
+        super(x, y, def);
         this.moveSpeed = def.speed;
 
         setGlobalCap(1); // Holds 1 item
