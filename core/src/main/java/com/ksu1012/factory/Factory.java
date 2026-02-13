@@ -126,9 +126,4 @@ public class Factory extends Building {
             addInternalItem(entry.getKey(), entry.getValue());
         }
     }
-
-    // Helper for visual feedback
-    public Recipe getActiveRecipe() {
-        return activeRecipe;
-    }
 }

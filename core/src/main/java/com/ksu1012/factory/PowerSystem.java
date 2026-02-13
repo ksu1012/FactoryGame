@@ -54,18 +54,17 @@ public class PowerSystem {
             }
         }
 
-        update();
+        update(0);
     }
 
-    public void update() {
+    public void update(float delta) {
         for (PowerNetwork net : networks) {
-            net.update();
+            net.update(delta);
         }
     }
 
     private boolean usesPower(Building b) {
-        BuildingDef def = b.getDefinition();
-        return def.powerConsumption > 0 || def.powerGeneration > 0 || b instanceof PowerPole;
+        return b.connectsToPower();
     }
 
     public List<PowerNetwork> getNetworks() { return networks; }

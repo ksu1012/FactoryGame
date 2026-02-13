@@ -10,6 +10,7 @@ public abstract class BuildingDef {
 
     public float powerGeneration = 0f;
     public float powerConsumption = 0f;
+    public float energyCapacity = 0f;
 
     public BuildingDef(int width, int height) {
         this.width = width;
@@ -27,6 +28,11 @@ public abstract class BuildingDef {
     }
     public BuildingDef setPowerConsumption(float amount) {
         this.powerConsumption = amount;
+        return this;
+    }
+
+    public BuildingDef setEnergyCapacity(float amount) {
+        this.energyCapacity = amount;
         return this;
     }
 }

@@ -38,8 +38,13 @@ public abstract class Building {
     // Types of terrain the Building can be placed on
     protected HashSet<TerrainType> validTerrain = new HashSet<>();
 
+    public float energyCapacity = 0f;
+    public float currentEnergy = 0f;
+    public float powerProduction = 0f;   // Current output
+    public float powerConsumption = 0f;  // Current demand
+
     public PowerNetwork network = null;
-    public Boolean hasPower = false;
+    public boolean hasPower = false;
 
     public Building(int x, int y, BuildingDef def) {
         this.x = x;
@@ -48,6 +53,9 @@ public abstract class Building {
 
         this.width = def.width;
         this.height = def.height;
+
+        this.energyCapacity = def.energyCapacity;
+        this.powerConsumption = def.powerConsumption;
 
         // Allow building on dirt by default
         validTerrain.add(TerrainType.DIRT);
@@ -205,5 +213,13 @@ public abstract class Building {
 
     public BuildingDef getDefinition() {
         return definition;
+    }
+
+    public boolean isBattery() {
+        return definition.energyCapacity > 0;
+    }
+
+    public boolean connectsToPower() {
+        return energyCapacity > 0 || definition.powerGeneration > 0 || powerConsumption > 0 || this instanceof PowerPole;
     }
 }

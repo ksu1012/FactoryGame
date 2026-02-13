@@ -352,7 +352,7 @@ public class Main extends ApplicationAdapter {
             b.update(delta, map);
         }
 
-        powerSystem.update();
+        powerSystem.update(delta);
     }
 
     // Check against bounds, occupancy, and Building's own terrain rules
@@ -611,7 +611,10 @@ public class Main extends ApplicationAdapter {
             batch.setColor(CORE_COLOR);
         } else if (b instanceof PowerPole) {
             batch.setColor(POWER_POLE_COLOR);
-        } else {
+        } else if (b instanceof  Battery) {
+            batch.setColor(Color.LIME);
+        }
+        else {
             batch.setColor(Color.WHITE);
         }
 
@@ -621,6 +624,22 @@ public class Main extends ApplicationAdapter {
             (b.y * TILE_SIZE) + 2,
             (b.width * TILE_SIZE) - 4,
             (b.height * TILE_SIZE) - 4);
+
+        if (b.getDefinition().energyCapacity > 0) {
+            // Check if the Building stores energy
+            float percent = b.currentEnergy / b.getDefinition().energyCapacity;
+
+            // Bar background
+            batch.setColor(Color.BLACK);
+            batch.draw(whitePixel, (b.x * TILE_SIZE) + 4, (b.y * TILE_SIZE) + 4, (b.width * TILE_SIZE) - 8, 4);
+
+            // Draw green fill bar
+            if (percent > 0) {
+                // Red at low energy, transitioning to green at high energy
+                batch.setColor(1f - percent, percent, 0f, 1f);
+                batch.draw(whitePixel, (b.x * TILE_SIZE) + 4, (b.y * TILE_SIZE) + 4, ((b.width * TILE_SIZE) - 8) * percent, 4);
+            }
+        }
 
 
         // --- DRAW DIRECTION INDICATOR (Yellow Dot) ---
