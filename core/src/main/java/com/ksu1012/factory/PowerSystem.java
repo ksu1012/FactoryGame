@@ -40,9 +40,17 @@ public class PowerSystem {
                     if (visited.contains(other)) continue;
                     if (!usesPower(other)) continue;
 
-                    // Check Distance
+                    // Calculate center point
+                    float currentCenterX = current.x + (current.width / 2f);
+                    float currentCenterY = current.y + (current.height / 2f);
+
+                    float otherCenterX = other.x + (other.width / 2f);
+                    float otherCenterY = other.y + (other.height / 2f);
+
+                    // Calculate distance between centers
+                    float dist = Vector2.dst(currentCenterX, currentCenterY, otherCenterX, otherCenterY);
+
                     // Use the greater connection radius of the two Buildings (e.g. a PowerPole can connect to a Factory without contact)
-                    float dist = Vector2.dst(current.x, current.y, other.x, other.y);
                     float range = Math.max(current.getConnectionRadius(), other.getConnectionRadius());
 
                     if (dist <= range) {

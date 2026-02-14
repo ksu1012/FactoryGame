@@ -570,7 +570,6 @@ public class Main extends ApplicationAdapter {
         // Iterate through all active power networks
         if (powerSystem != null) {
             for (PowerNetwork net : powerSystem.getNetworks()) {
-
                 // Compare every building in the network to every other building
                 // (i + 1 optimization prevents drawing the same line twice)
                 for (int i = 0; i < net.members.size(); i++) {
@@ -579,20 +578,20 @@ public class Main extends ApplicationAdapter {
                     for (int j = i + 1; j < net.members.size(); j++) {
                         Building b = net.members.get(j);
 
-                        // Check if they are close enough to physically connect
+                        float axGrid = a.x + (a.width / 2f);
+                        float ayGrid = a.y + (a.height / 2f);
+                        float bxGrid = b.x + (b.width / 2f);
+                        float byGrid = b.y + (b.height / 2f);
+
+                        float dist = Vector2.dst(axGrid, ayGrid, bxGrid, byGrid);
                         float range = Math.max(a.getConnectionRadius(), b.getConnectionRadius());
-                        float dst = Vector2.dst(a.x, a.y, b.x, b.y);
 
-                        // If they are within range (and not the same building)
-                        if (dst <= range) {
-                            // Calculate centers (in pixels)
-                            float x1 = (a.x * TILE_SIZE) + (a.width * TILE_SIZE) / 2f;
-                            float y1 = (a.y * TILE_SIZE) + (a.height * TILE_SIZE) / 2f;
-                            float x2 = (b.x * TILE_SIZE) + (b.width * TILE_SIZE) / 2f;
-                            float y2 = (b.y * TILE_SIZE) + (b.height * TILE_SIZE) / 2f;
-
-                            // Draw the beam
-                            drawLine(x1, y1, x2, y2, 2f, POWER_LINE_COLOR); // 2f thickness
+                        if (dist <= range) {
+                            float axPixel = axGrid * TILE_SIZE;
+                            float ayPixel = ayGrid * TILE_SIZE;
+                            float bxPixel = bxGrid * TILE_SIZE;
+                            float byPixel = byGrid * TILE_SIZE;
+                            drawLine(axPixel, ayPixel, bxPixel, byPixel, 2f, POWER_LINE_COLOR);
                         }
                     }
                 }
