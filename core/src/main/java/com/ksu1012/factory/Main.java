@@ -141,7 +141,7 @@ public class Main extends ApplicationAdapter {
         uiStage = new Stage(new ScreenViewport());
 
         BitmapFont font = new BitmapFont();
-        font.getData().setScale(2.0f);
+        font.getData().setScale(1.0f);
 
         LabelStyle style = new LabelStyle();
         style.font = font;
@@ -273,6 +273,15 @@ public class Main extends ApplicationAdapter {
             hoveredTile = map[gridX][gridY];
         } else {
             hoveredTile = null;
+        }
+
+        // Fullscreen toggle (F11)
+        if (Gdx.input.isKeyJustPressed(Input.Keys.F11)) {
+            if (Gdx.graphics.isFullscreen()) { // Switch to windowed
+                Gdx.graphics.setWindowedMode(1280, 720);
+            } else { // Switch to fullscreen
+                Gdx.graphics.setFullscreenMode(Gdx.graphics.getDisplayMode());
+            }
         }
 
         // Selection Input
