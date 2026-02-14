@@ -11,6 +11,8 @@ import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.Touchable;
+import com.badlogic.gdx.scenes.scene2d.ui.Button;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Label.LabelStyle;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
@@ -22,6 +24,7 @@ import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -54,7 +57,7 @@ public class Main extends ApplicationAdapter {
 
     // Selection state
     private Direction currentFacing = Direction.NORTH;
-    private BuildingType selectedBuilding = BuildingType.BASIC_CONVEYOR;
+    private BuildingType selectedBuilding = null;
 
     // --- VISUAL SETTINGS ---
     private final Color CORE_COLOR = new Color(0.8f, 0.2f, 0.8f, 1f);
@@ -70,6 +73,7 @@ public class Main extends ApplicationAdapter {
     private Label resourceLabel;
     private Label selectionLabel;
     private StringBuilder hudString = new StringBuilder();
+    private HashMap<BuildingType, Button> buildingButtons = new HashMap<>();
 
     // --- PHYSICS SETTINGS ---
     private final float ACCELERATION = 10000f;
@@ -165,10 +169,32 @@ public class Main extends ApplicationAdapter {
         buttonStyle.font = font;
         buttonStyle.fontColor = Color.WHITE;
 
+        // Information display table
+        Table rootTable = new Table();
+        rootTable.setFillParent(true);
+        rootTable.top().left();
+        // Allow clicking through empty space
+        rootTable.setTouchable(Touchable.childrenOnly);
+
+        resourceLabel = new Label("Resources: 0", style);
+        // Allow clicking through text
+        resourceLabel.setTouchable(Touchable.disabled);
+
+        selectionLabel = new Label("Selected: None", style);
+        selectionLabel.setTouchable(Touchable.disabled);
+
+        rootTable.add(resourceLabel).pad(10).left();
+        rootTable.row();
+        rootTable.add(selectionLabel).pad(10).left();
+        rootTable.row().expandY();
+
+        uiStage.addActor(rootTable);
+
         // Create the Toolbar Table
         Table toolbarTable = new Table();
         toolbarTable.bottom(); // Align to bottom of screen
         toolbarTable.setFillParent(true);
+        toolbarTable.setTouchable(Touchable.childrenOnly); // Important!
 
         // Add Buttons from the BuildingType enum, skipping core (maybe allow this in future)
         for (BuildingType type : BuildingType.values()) {
@@ -178,12 +204,18 @@ public class Main extends ApplicationAdapter {
             String name = type.name().substring(0, 1) + type.name().substring(1).toLowerCase();
             TextButton button = new TextButton(name, buttonStyle);
 
-            // Add listener
-            button.addListener(new ClickListener() {
+            // Add Button to HashMap
+            buildingButtons.put(type, button);
+
+            button.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
                 @Override
-                public void clicked(InputEvent event, float x, float y) {
-                    selectedBuilding = type;
-                    // Update visuals
+                public void clicked(com.badlogic.gdx.scenes.scene2d.InputEvent event, float x, float y) {
+                    // Deselect building if clicking on currently selected
+                    if (selectedBuilding == type) {
+                        selectedBuilding = null;
+                    } else { // Else select another building
+                        selectedBuilding = type;
+                    }
                 }
             });
 
@@ -193,29 +225,8 @@ public class Main extends ApplicationAdapter {
         // Add Toolbar to Stage
         uiStage.addActor(toolbarTable);
 
-        // Table
-        Table rootTable = new Table();
-        rootTable.setFillParent(true);
-        rootTable.top().left();
-        rootTable.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.childrenOnly);
-
-
-        // Create Labels
-        resourceLabel = new Label("Resources: 0", style);
-        selectionLabel = new Label("Selected: Conveyor", style);
-
-        // Add to Table
-        rootTable.add(resourceLabel).pad(10).left();
-        rootTable.row(); // New line
-        rootTable.add(selectionLabel).pad(10).left();
-        rootTable.row().expandY(); // Push everything else down
-
-        uiStage.addActor(rootTable);
-
         InputMultiplexer multiplexer = new InputMultiplexer();
-
         multiplexer.addProcessor(uiStage);
-
         multiplexer.addProcessor(new InputAdapter() {
             @Override
             public boolean scrolled(float amountX, float amountY) {
@@ -284,12 +295,10 @@ public class Main extends ApplicationAdapter {
             }
         }
 
-        // Selection Input
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_1)) selectedBuilding = BuildingType.BASIC_CONVEYOR;
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_2)) selectedBuilding = BuildingType.FAST_CONVEYOR;
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_3)) selectedBuilding = BuildingType.BASIC_DRILL;
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_4)) selectedBuilding = BuildingType.LARGE_DRILL;
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_5)) selectedBuilding = BuildingType.SMELTER;
+        // Deselect Building if esc is pressed
+        if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+            selectedBuilding = null;
+        }
 
         // --- ROTATION ---
         if (Gdx.input.isKeyJustPressed(Input.Keys.R)) {
@@ -297,7 +306,7 @@ public class Main extends ApplicationAdapter {
         }
 
         // --- PLACEMENT ---
-        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT)) {
+        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT) && selectedBuilding != null) {
             Vector2 stagePos = uiStage.screenToStageCoordinates(new Vector2(Gdx.input.getX(), Gdx.input.getY()));
 
             // Ignore Button clicks
@@ -409,30 +418,51 @@ public class Main extends ApplicationAdapter {
         resourceLabel.setText(hudString);
 
         // Update Selection
-        String buildingName = formatEnumName(selectedBuilding.name());
-        selectionLabel.setText("SELECTED: " + buildingName + "\nROTATION: " + currentFacing);
-        hudString.setLength(0);
-        hudString.append("SELECTED: ").append(formatEnumName(selectedBuilding.name())).append("\n");
-        hudString.append("ROTATION: ").append(currentFacing).append("\n");
-        hudString.append("COST:\n");
+        hudString.setLength(0); // Clear buffer again for new label
 
-        if (selectedBuilding.def.cost.isEmpty()) {
-            hudString.append(" Free");
-        } else {
-            for (Map.Entry<ItemType, Integer> entry : selectedBuilding.def.cost.entrySet()) {
-                hudString.append(" - ")
-                    .append(formatEnumName(entry.getKey().name()))
-                    .append(": ")
-                    .append(entry.getValue())
-                    .append("\n");
+        if (selectedBuilding != null) {
+            // Name and Rotation
+            hudString.append("SELECTED: ").append(formatEnumName(selectedBuilding.name())).append("\n");
+            hudString.append("ROTATION: ").append(currentFacing).append("\n");
+
+            // Cost List
+            hudString.append("COST:\n");
+            if (selectedBuilding.def.cost.isEmpty()) {
+                hudString.append(" Free");
+            } else {
+                for (Map.Entry<ItemType, Integer> entry : selectedBuilding.def.cost.entrySet()) {
+                    hudString.append(" - ")
+                        .append(formatEnumName(entry.getKey().name()))
+                        .append(": ")
+                        .append(entry.getValue())
+                        .append("\n");
+                }
             }
+        } else {
+            // Nothing selected
+            hudString.append("SELECTED: [None]");
         }
         selectionLabel.setText(hudString);
 
+        // Sync Toolbar Buttons
+        // Highlight only the selected Building
+        for (Map.Entry<BuildingType, com.badlogic.gdx.scenes.scene2d.ui.Button> entry : buildingButtons.entrySet()) {
+            BuildingType type = entry.getKey();
+            com.badlogic.gdx.scenes.scene2d.ui.Button btn = entry.getValue();
+
+            // Set Checked only if it matches the current selection
+            if (type == selectedBuilding) {
+                btn.setChecked(true);
+            } else {
+                btn.setChecked(false);
+            }
+        }
+
+        // Update Stage logic
         uiStage.act();
     }
 
-    // Helper to turn "COPPER_ORE" into "Copper Ore"
+    // Helper to format text
     private String formatEnumName(String name) {
         String[] words = name.toLowerCase().split("_");
         StringBuilder sb = new StringBuilder();
@@ -487,7 +517,7 @@ public class Main extends ApplicationAdapter {
         }
 
         // Preview drawing (Ghost Layer)
-        if (hoveredTile != null && hoveredTile.building == null) {
+        if (selectedBuilding != null && hoveredTile != null && hoveredTile.building == null) {
 
             // Create temporary ghost building
             Building temp = selectedBuilding.create(hoveredTile.x, hoveredTile.y);
