@@ -17,6 +17,8 @@ Left Click: Place Selected Structure
 
 Right Click: Remove Structure
 
+Escape: De-select Structure
+
 F11: Toggle full-screen
 
 
